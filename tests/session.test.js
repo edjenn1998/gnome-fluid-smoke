@@ -105,6 +105,7 @@ async function fixture({wayland = true} = {}) {
         Extension: entry.namespace.default, shellGlobal, errors, actors,
         emitters: [background, layout, shield, settings, display, overview],
         move(x, y) { point = {x, y}; time += 0.017; },
+        advance(seconds) { time += seconds; },
         fire() {
             assert.equal(timers.size, 1);
             const [id, {callback}] = [...timers][0];
@@ -130,6 +131,20 @@ test('repeated lifecycle and monitor rebuilds release timers, signals and surfac
         assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
         assert.ok(f.surfaces.every(surface => surface.destroyed));
     }
+});
+
+test('sustained missed active callbacks select the bounded 30 Hz fallback', async () => {
+    const f = await fixture();
+    const session = new f.Session();
+    session.start();
+    f.fire();
+    for (let i = 0; i < 35; i++) {
+        f.move(110 + i, 110);
+        f.advance(0.02);
+        f.fire();
+    }
+    assert.equal([...f.timers.values()][0].interval, 33);
+    session.destroy();
 });
 
 test('lock, overview and reduced motion stop polling and allow resume', async () => {

@@ -51,6 +51,10 @@ export class MonitorSurface {
                 this.reset();
             return;
         }
+        // Keep the actual sampling interval, including the 80 ms idle observer.
+        // The solver bounds integration time separately from pointer speed.
+        const dt = this.lastFrame ? Math.max(0, now - this.lastFrame) : 1 / 60;
+        this.lastFrame = now;
         if (segment) {
             this.lastMotion = now;
             this.active = true;
@@ -61,8 +65,6 @@ export class MonitorSurface {
             this.reset();
             return;
         }
-        const dt = this.lastFrame ? Math.min(1 / 15, Math.max(0, now - this.lastFrame)) : 1 / 60;
-        this.lastFrame = now;
         this.probe.step(dt, segment, now * 0.7);
         this.content.invalidate();
     }

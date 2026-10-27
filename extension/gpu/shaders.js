@@ -32,18 +32,32 @@ const source = `
 `;
 
 export const advectVelocity = {
-    declarations: grid + source + 'uniform vec2 fs_impulse;',
+    declarations: grid + source + 'uniform vec2 fs_impulse; uniform float fs_velocity_decay;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 v = velocity(uv);
         vec2 back = bounded(uv - fs_dt * v / fs_size);
-        v = velocity(back) * exp(-0.3 * fs_dt);
+        v = velocity(back) * exp(-fs_velocity_decay * fs_dt);
         float density = texture2D(cogl_sampler1, uv).a;
         v.y -= min(density, 3.0) * 18.0 * fs_dt;
-        v += fs_impulse * splat(uv) * (10.0 * fs_dt);
+        v += (fs_impulse - v) * splat(uv) * (1.0 - exp(-30.0 * fs_dt));
         float speed = length(v);
         v *= min(1.0, 180.0 / max(speed, 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
+    `,
+};
+
+export const diffuseVelocity = {
+    declarations: grid + 'uniform float fs_viscosity;',
+    body: `
+        vec2 uv = cogl_tex_coord_in[0].xy;
+        vec2 h = 1.0 / fs_size;
+        vec2 v = velocity(uv);
+        vec2 laplacian = velocity(uv - vec2(h.x, 0.0))
+            + velocity(uv + vec2(h.x, 0.0))
+            + velocity(uv - vec2(0.0, h.y))
+            + velocity(uv + vec2(0.0, h.y)) - 4.0 * v;
+        cogl_color_out = vec4(v + fs_viscosity * fs_dt * laplacian, 0.0, 1.0);
     `,
 };
 
@@ -61,7 +75,7 @@ export const curl = {
 };
 
 export const confine = {
-    declarations: grid,
+    declarations: grid + 'uniform float fs_vorticity;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 h = 1.0 / fs_size;
@@ -72,7 +86,7 @@ export const confine = {
         vec2 n = vec2(r - l, b - t);
         n /= max(length(n), 0.0001);
         float c = texture2D(cogl_sampler1, uv).r;
-        vec2 v = velocity(uv) + vec2(n.y, -n.x) * c * (12.0 * fs_dt);
+        vec2 v = velocity(uv) + vec2(n.y, -n.x) * c * (fs_vorticity * fs_dt);
         v *= min(1.0, 180.0 / max(length(v), 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
     `,
@@ -122,12 +136,41 @@ export const project = {
 };
 
 export const advectDye = {
-    declarations: grid + source + 'uniform vec3 fs_color;',
+    declarations: grid + 'uniform vec2 fs_dye_size;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
-        vec2 back = bounded(uv - fs_dt * velocity(uv) / fs_size);
-        vec4 dye = texture2D(cogl_sampler1, back) * exp(-0.7 * fs_dt);
-        float amount = splat(uv) * (5.0 * fs_dt);
+        vec2 back = clamp(uv - fs_dt * velocity(uv) / fs_size,
+            0.5 / fs_dye_size, 1.0 - 0.5 / fs_dye_size);
+        cogl_color_out = texture2D(cogl_sampler1, back);
+    `,
+};
+
+// Limited MacCormack: forward + half the round-trip transport error. The local
+// departure-cell extrema limiter prevents negative density and ringing. Layer 1
+// is the original dye; layer 2 is the forward-advected dye, never the output.
+export const correctDye = {
+    declarations: grid + source + `
+        uniform vec2 fs_dye_size;
+        uniform vec3 fs_color;
+        uniform float fs_dye_decay;
+        uniform float fs_amount;
+    `,
+    body: `
+        vec2 uv = cogl_tex_coord_in[0].xy;
+        vec2 v = velocity(uv) / fs_size;
+        vec2 back = clamp(uv - fs_dt * v, 0.5 / fs_dye_size, 1.0 - 0.5 / fs_dye_size);
+        vec2 forward = clamp(uv + fs_dt * v, 0.5 / fs_dye_size, 1.0 - 0.5 / fs_dye_size);
+        vec4 dye = texture2D(cogl_sampler2, uv) + 0.5 *
+            (texture2D(cogl_sampler1, uv) - texture2D(cogl_sampler2, forward));
+        vec2 base = (floor(back * fs_dye_size - 0.5) + 0.5) / fs_dye_size;
+        vec2 h = 1.0 / fs_dye_size;
+        vec4 a = texture2D(cogl_sampler1, base);
+        vec4 b = texture2D(cogl_sampler1, base + vec2(h.x, 0.0));
+        vec4 c = texture2D(cogl_sampler1, base + vec2(0.0, h.y));
+        vec4 d = texture2D(cogl_sampler1, base + h);
+        dye = clamp(dye, min(min(a, b), min(c, d)), max(max(a, b), max(c, d)));
+        dye *= exp(-fs_dye_decay * fs_dt);
+        float amount = splat(uv) * fs_amount;
         dye += vec4(fs_color * amount, amount);
         // RGB is density-weighted, alpha is scalar smoke density (not opacity).
         cogl_color_out = min(dye, vec4(4.0));
@@ -140,7 +183,8 @@ export const presentation = {
         vec4 dye = texture2D(cogl_sampler0, cogl_tex_coord_in[0].xy);
         vec3 tint = dye.rgb / max(dye.a, 0.0001);
         float opacity = 1.0 - exp(-1.6 * dye.a);
-        vec3 color = pow(max(tint * opacity, vec3(0.0)), vec3(0.85));
+        // Do not amplify near-zero cell/interpolation errors with gamma < 1.
+        vec3 color = max(tint * opacity, vec3(0.0));
         cogl_color_out = vec4(color * fs_opacity, fs_opacity);
     `,
 };

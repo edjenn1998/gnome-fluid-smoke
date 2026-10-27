@@ -7,6 +7,7 @@ for (const [name, shader] of Object.entries(shaders)) {
     const input = `#version 120
         uniform sampler2D cogl_sampler0;
         uniform sampler2D cogl_sampler1;
+        uniform sampler2D cogl_sampler2;
         varying vec4 cogl_tex_coord_in[1];
         #define cogl_color_out gl_FragColor
         ${shader.declarations}

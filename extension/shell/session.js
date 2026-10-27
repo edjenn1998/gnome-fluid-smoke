@@ -11,11 +11,14 @@ import {locateMonitor, movementSegment} from '../core/coordinates.js';
 import {MonitorSurface} from './surface.js';
 
 export class ProbeSession {
-    constructor() {
+    constructor({fps = 60} = {}) {
         this.signals = [];
         this.surfaces = [];
         this.source = 0;
         this.previous = null;
+        this.frameInterval = fps === 30 ? 33 : 17;
+        this.slowFrames = 0;
+        this.lastTick = 0;
     }
 
     start() {
@@ -77,6 +80,8 @@ export class ProbeSession {
     refresh() {
         this.schedule(0);
         this.previous = null;
+        this.lastTick = 0;
+        this.slowFrames = 0;
         for (const surface of this.surfaces)
             surface.reset();
         const paused = Main.screenShield.active || Main.overview.visible ||
@@ -106,6 +111,7 @@ export class ProbeSession {
     }
 
     tick() {
+        const started = GLib.get_monotonic_time() / 1e6;
         const [point] = this.tracker.get_pointer();
         const monitors = this.surfaces.map(surface => surface.monitor);
         const monitor = locateMonitor(monitors, point.x, point.y);
@@ -118,7 +124,16 @@ export class ProbeSession {
             surface.update(now, i === monitor ? segment : null,
                 global.display.get_monitor_in_fullscreen(surface.monitor.index));
         }
-        this.schedule(this.surfaces.some(surface => surface.active) ? 17 : 80);
+        const active = this.surfaces.some(surface => surface.active);
+        const work = (GLib.get_monotonic_time() / 1e6 - started) * 1000;
+        // Submission time and missed callbacks are only overload signals, not
+        // GPU measurements. Stay at 30 until the session is restarted once busy.
+        const late = this.lastTick && (started - this.lastTick) * 1000 > 25;
+        this.slowFrames = active && (work > 8 || late) ? this.slowFrames + 1 : 0;
+        if (this.slowFrames >= 30)
+            this.frameInterval = 33;
+        this.lastTick = active ? started : 0;
+        this.schedule(active ? Math.max(1, Math.round(this.frameInterval - work)) : 80);
     }
 
     destroy() {

@@ -2,8 +2,30 @@
 // Generated with AI for personal use. Maintainer review required before EGO submission.
 
 export const PRESSURE_ITERATIONS = 24;
-export const MAX_STEP = 1 / 30;
+// Leave headroom for timer jitter at the 30 Hz fallback without doubling passes.
+export const MAX_STEP = 1 / 24;
 export const MAX_SUBSTEPS = 2;
+
+// Developer tuning, not a preferences UI. Viscosity is cells²/second; decay
+// coefficients are per second. Explicit diffusion requires nu * dt <= 1/4.
+export const DEFAULT_PARAMETERS = Object.freeze({
+    viscosity: 0.15,
+    velocityDissipation: 0.18,
+    dyeDissipation: 0.65,
+    vorticity: 8,
+});
+
+export function simulationParameters(overrides = {}) {
+    const limits = {viscosity: [0, 3], velocityDissipation: [0, 4],
+        dyeDissipation: [0.1, 4], vorticity: [0, 12]};
+    return Object.fromEntries(Object.entries(DEFAULT_PARAMETERS).map(([name, fallback]) => {
+        const value = overrides[name] ?? fallback;
+        if (!Number.isFinite(value))
+            throw new Error(`Fluid Smoke: invalid ${name}`);
+        const [low, high] = limits[name];
+        return [name, Math.max(low, Math.min(high, value))];
+    }));
+}
 
 // Discard excess wall time after stalls. Never run an unbounded catch-up loop.
 // Split the pointer segment too, rather than emitting it repeatedly per substep.

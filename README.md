@@ -5,12 +5,14 @@ Move the pointer to stir colored smoke across a black desktop, behind applicatio
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Status: 0.2.0-alpha.1
+## Status: 0.2.0-alpha.2 — laptop test build
 
-This first fluid-simulation prerelease replaces the original upward-drifting
+The fluid-simulation builds replace the original upward-drifting
 trails with mouse-driven velocity, buoyancy, swirling vorticity, pressure
 projection and advected rainbow dye. Density-based shading gives the color a
-soft, translucent appearance against black.
+soft, translucent appearance against black. Alpha.2 adds higher-resolution dye,
+limited MacCormack transport, explicit viscosity and narrower momentum-driven
+injection. It is a test build, not a final release.
 
 The user tested `0.1.0-poc.2` and reported working visuals that looked cool but
 did not resemble smoke. The new shaders passed offscreen software-rendered
@@ -20,7 +22,8 @@ performance still need GNOME laptop testing.** See [TESTING.md](TESTING.md).
 ### Features
 
 - Independent, bounded floating-point fluid state for each logical monitor.
-- Semi-Lagrangian velocity/dye advection, buoyancy and vorticity confinement.
+- Semi-Lagrangian velocity advection, limited MacCormack dye transport, viscosity,
+  buoyancy and vorticity confinement.
 - Divergence calculation, 24 Jacobi pressure iterations and velocity projection.
 - Smooth pointer-segment injection with capped momentum and changing RGB color.
 - Black background, ten-second idle clear and simulation suspension.
@@ -34,8 +37,10 @@ quality selection and target-hardware performance measurements are future work.
 
 ## Download and install
 
-Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from
-[v0.2.0-alpha.1 on GitHub](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.1).
+Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
+[alpha.2 test prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.2).
+The same build is in `dist/` after running `python3 tools/package.py`.
+The older alpha.1 release does **not** contain these changes.
 
 For an existing installation, first disable it:
 
@@ -57,7 +62,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `0.2.0-alpha.1` or numeric version `3`. GNOME 51 / Wayland is the
+Expect version `0.2.0-alpha.2` or numeric version `4`. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.
@@ -96,16 +101,20 @@ npm run test:gpu
 
 ## Configuration and performance
 
-There is no preferences window yet. Disable/re-enable to pause and clear.
+There is no preferences window yet. Developer viscosity/dissipation/confinement
+defaults are in `extension/core/simulation.js`; constructor overrides are validated.
+Disable/re-enable to pause and clear.
 GNOME reduced motion stops animation. Fullscreen monitors suspend; lock and
 Overview suspend the session. Display changes reset all fields.
 
 Logical coordinates handle negative origins and mixed scaling. Monitor transitions
 reset the pointer segment. Hardware validation of all layouts remains pending.
 
-Active work is requested approximately every 17 ms; idle pointer checks use
-80 ms. These are timer intervals, not measured FPS. Each simulation substep uses
-30 GPU draws, with at most two substeps after a stall. Textures are reused;
+Active work targets 17 ms, accounting for submission time, and falls back to 33 ms
+after sustained callback/submission overload. Idle pointer checks use 80 ms.
+These are timer targets, not measured FPS or GPU timings. Each simulation substep
+uses 32 GPU draws, with at most two substeps after a stall. Dye has twice the flow
+grid's width/height, up to 768 pixels on its long edge. Textures are reused;
 there is no production CPU readback. Explicit display-power handling, adaptive
 quality and long-run profiling remain future work.
 

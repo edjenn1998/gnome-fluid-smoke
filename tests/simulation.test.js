@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
-import {planSteps, MAX_STEP, MAX_SUBSTEPS, PRESSURE_ITERATIONS} from '../extension/core/simulation.js';
+import {planSteps, MAX_STEP, MAX_SUBSTEPS, PRESSURE_ITERATIONS,
+    simulationParameters} from '../extension/core/simulation.js';
 import * as shaders from '../extension/gpu/shaders.js';
 
 test('time planner bounds stalls and rejects invalid or nonpositive elapsed time', () => {
@@ -72,7 +73,7 @@ async function fixture({failAllocation = 0} = {}) {
         new URL('../extension/gpu/feedback.js', import.meta.url), 'utf8'), {context});
     await module.link(specifier => {
         const exports = specifier === 'gi://Cogl' ? {default: Cogl} :
-            specifier === './shaders.js' ? shaders : {planSteps, PRESSURE_ITERATIONS};
+            specifier === './shaders.js' ? shaders : {planSteps, PRESSURE_ITERATIONS, simulationParameters};
         return new vm.SyntheticModule(Object.keys(exports), function () {
             for (const [key, value] of Object.entries(exports))
                 this.setExport(key, value);
@@ -86,15 +87,17 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     const f = await fixture();
     const fluid = new f.Simulation({}, 64, 36);
     fluid.initialize();
-    assert.equal(f.targets.length, 8);
+    assert.equal(f.targets.length, 9);
     fluid.step(1 / 15, [0.2, 0.3, 0.4, 0.5], 0.5);
-    assert.equal(f.draws.length, 2 * (PRESSURE_ITERATIONS + 6));
+    assert.equal(f.draws.length, 2 * (PRESSURE_ITERATIONS + 8));
     for (let i = 0; i < 2; i++) {
-        const batch = f.draws.slice(i * 30, (i + 1) * 30);
-        assert.equal(batch[0].shader, shaders.advectVelocity.body);
-        assert.equal(batch[3].shader, shaders.divergence.body);
-        assert.equal(batch[28].shader, shaders.project.body);
-        assert.equal(batch[29].shader, shaders.advectDye.body);
+        const batch = f.draws.slice(i * 32, (i + 1) * 32);
+        assert.equal(batch[0].shader, shaders.diffuseVelocity.body);
+        assert.equal(batch[1].shader, shaders.advectVelocity.body);
+        assert.equal(batch[4].shader, shaders.divergence.body);
+        assert.equal(batch[29].shader, shaders.project.body);
+        assert.equal(batch[30].shader, shaders.advectDye.body);
+        assert.equal(batch[31].shader, shaders.correctDye.body);
     }
     fluid.step(1 / 60, null, 1);
     assert.equal(f.draws.at(-1).uniforms.fs_emit[0], 0);
@@ -106,6 +109,12 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     assert.equal(fluid.targets.length, 0);
     assert.equal(Object.keys(fluid.pipelines).length, 0);
     assert.equal(fluid.velocity, null);
+});
+
+test('viscosity is configurable within the explicit diffusion stability bound', () => {
+    assert.equal(simulationParameters({viscosity: 0}).viscosity, 0);
+    assert.ok(simulationParameters({viscosity: 100}).viscosity * MAX_STEP <= 0.25);
+    assert.throws(() => simulationParameters({dyeDissipation: NaN}), /invalid/);
 });
 
 test('partial GPU allocation can release every recorded native owner', async () => {

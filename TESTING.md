@@ -1,5 +1,47 @@
 # Validation record and acceptance checklist
 
+## 0.2.0-alpha.2 — 2026-10-27
+
+Test prerelease only. No GNOME/GJS session is available in this environment.
+The updated source passes 18 JS bookkeeping/lifecycle tests and all ten GLSL 1.20
+shader checks. Offscreen execution uses Mesa llvmpipe, RGBA16F targets, a 96×64
+flow grid and a **192×128 dye grid**, exercising distinct field resolutions and
+the three-input dye correction pass. Validation dependencies are extracted under
+`/tmp/opencode/fluid-smoke-validation`, never included in the extension.
+
+Numerical results from the actual shader bodies:
+
+* Pressure divergence RMS **0.600750 → 0.409050**; Poisson residual at 24/80
+  iterations **0.406367 / 0.217060**. This remains an approximate projection.
+* Uniform dye after one second, 30/60 Hz: **0.516602 / 0.511719** (ideal 0.522046).
+* No-input transport: Gaussian dye packet in a persistent 12-flow-cells/s field
+  moves from **(57.600, 64.000) to (81.443, 63.972)** in one second. Expected
+  displacement: 24 dye cells. A fade-in-place implementation cannot pass.
+* Full solver: two seconds of circular pointer force, then no emission. Density
+  totals at stop / +1s / +2s: **2825.477 / 2160.608 / 1259.283**. Dye centroids:
+  **(91.976,65.191) → (79.813,46.526) → (82.160,40.981)**. Normalized density
+  shape L1 change over the first no-input second: **1.340**. Normalization removes
+  uniform fading as an explanation. Curls persist and all checked values are finite.
+* Viscosity smooths a localized velocity impulse without negative overshoot and
+  preserves uniform interior velocity. Zero dye renders opaque exact black.
+* Surface test verifies post-input updates continue without new segments, then
+  clear and stop at ten seconds. Session test verifies the 30 Hz fallback.
+
+MacCormack with a local limiter is not globally mass-conservative; these checks
+demonstrate transport/deformation rather than an exact mass budget. They do not
+prove wispy visual quality, absence of grid artifacts, Cogl layer binding, 60/30
+FPS, native resource release, or responsiveness on the Dell XPS 13. Those remain
+the laptop acceptance criteria below. No final release has been made.
+
+For this environment's optional validation dependencies:
+
+```sh
+node tools/validate_shaders.js /tmp/opencode/fluid-smoke-validation/usr/bin/glslangValidator
+LD_LIBRARY_PATH=/tmp/opencode/fluid-smoke-validation/usr/lib/x86_64-linux-gnu \
+__EGL_VENDOR_LIBRARY_FILENAMES=/tmp/opencode/fluid-smoke-validation/usr/share/glvnd/egl_vendor.d/50_mesa.json \
+LIBGL_ALWAYS_SOFTWARE=1 python3 tools/validate_gpu.py
+```
+
 ## 0.2.0-alpha.1 — 2026-10-27
 
 The user reports the earlier `0.1.0-poc.2` works and looks cool but resembles
@@ -73,14 +115,16 @@ eslint --no-eslintrc --env es6 \
 
 ## Laptop acceptance checklist — new alpha remains untested
 
-Install using `README.md`, log out/in, enable and verify version **3** /
-`0.2.0-alpha.1`. Record Shell version, Wayland status, GPU/driver and display layout.
+Install using `README.md`, log out/in, enable and verify version **4** /
+`0.2.0-alpha.2`. Record Shell version, Wayland status, GPU/driver and display layout.
 Watch Shell logs while enabling/disabling.
 
 ### Appearance and simulation
 
 - [ ] Every desktop monitor is black; motion produces rainbow smoke.
 - [ ] Slow/fast strokes and circles produce curls and spreading wisps, not lines.
+- [ ] Reverse direction sharply: observe rolling structures, then stop and verify
+      visible dye transport/stretching rather than stationary fading patches.
 - [ ] Smoke evolves after the pointer stops; ten seconds idle returns to black.
 - [ ] Ordinary movement is connected; pointer warps create no long streaks.
 - [ ] Move over Firefox and minimize/move it within 2–5 seconds: smoke exists

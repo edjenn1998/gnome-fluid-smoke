@@ -6,38 +6,76 @@ The user reported working poc.2 visuals and requested the fluid implementation.
 The complete hardware checklist is still open. The new multi-texture renderer
 has offscreen shader validation but awaits GNOME 51 laptop testing.
 
-## Current fluid renderer — 0.2.0-alpha.1
+## Implementation audit and current renderer — 0.2.0-alpha.2
 
-Eight RGBA16F targets per monitor: ping-pong velocity, dye and pressure, plus
-curl and divergence. At 384×216 this is approximately 5.1 MiB of texture storage
-per monitor, excluding driver/framebuffer overhead. Grids retain the 384-pixel
-long-edge cap. No textures/framebuffers are allocated in the per-frame loop.
+The original probe was **not fluid dynamics**: two GPU passes translated and
+faded stored color and added a distance-to-pointer-segment splat. It had no
+velocity, pressure, curl or momentum. Its 384-pixel grid, bilinear upscaling and
+Gaussian injection explain coarse blurry patches; it had no random noise source.
+We cannot identify the laptop's installed build from its appearance alone.
 
-Per substep: advect/damp velocity and add buoyancy/pointer force; compute curl;
-apply vorticity confinement; compute divergence; clear pressure and perform 24
-Jacobi iterations; subtract pressure gradient; advect/inject RGB dye + density.
-That is 30 draws. Presentation converts density-weighted RGB to an opaque,
-black-backed smoke image. The old blue-channel probe sentinel is removed.
+Alpha.1 source already contained genuine persistent velocity/dye, velocity and
+dye advection, finite-difference divergence/curl, Jacobi pressure projection and
+vorticity confinement. `MonitorSurface.update()` continued stepping after input
+stopped, until the ten-second reset. Its deficiencies included first-order dye
+transport on the same coarse grid, broad splats, weak pointer coupling, no physical
+viscosity and gamma amplification of faint density. Those are source findings,
+not evidence that its multipass Cogl path ran correctly on the laptop.
 
-Velocity units are grid cells/second. Sampling uses cell centers and clamped
-bilinear backtraces. Reflected normal velocity supplies divergence boundary
-samples; pressure uses clamped Neumann boundaries and projection zeros wall-normal
-velocity. This is a collocated, approximate stable-fluid solver: 24 iterations
-reduce rather than eliminate divergence. Semi-Lagrangian interpolation supplies
-numerical diffusion; a separate physical viscosity solve is not implemented.
+**Architecture assessment before changes:** `FluidSimulation` owns explicit Cogl
+RGBA16F textures/framebuffers. Each draw samples only separate input attachments;
+ping-pong swaps preserve fields across frames. This is a viable multipass solver
+architecture, not a single ShaderEffect accumulating a picture. Offscreen GLES
+tests establish shader feasibility; Cogl/GI execution and GPU cost still require
+GNOME 51.1 testing. No source-level blocker justifies a separate renderer yet.
 
-Wall time is capped at 1/15 second per update and split into at most two steps,
-each <=1/30 second. Pointer segments are partitioned between steps; impulse is
-derived from observed duration and capped at 120 cells/second. Advection/force
-velocity is capped at 180 cells/second before projection. Exponential velocity
-and dye decay are timestep-scaled. Ten seconds without motion clears all fields
-and suspends simulation. Existing lifecycle/session guards remain in use.
+Alpha.2 uses nine persistent targets per monitor: two velocity, two pressure,
+curl and divergence at the flow resolution; two dye and one forward-transport
+scratch target at twice its width and height. The flow long edge remains <=384,
+dye <=768. A 384×216 flow grid uses ~11.4 MiB of texture storage, excluding driver
+overhead. No per-frame texture/framebuffer allocation or CPU pixel loops occur.
 
-Each draw binds explicit input layers and a distinct output. No runtime readback
-or GPU finish is used. `flush()` submits the final dye framebuffer. Dropping all
-JS owners on destroy still relies on GJS GC for native release. New tests cover
-the draw graph and partial allocation cleanup; `tools/validate_gpu.py` executes
-the actual shader bodies through EGL/GLES3 on RGBA16F targets. See `TESTING.md`.
+Per substep (32 GPU draws at default viscosity):
+
+1. Explicit viscous diffusion of velocity using a five-point Laplacian.
+2. Bilinear semi-Lagrangian velocity advection, exponential drag, density buoyancy
+   and mouse-velocity relaxation force along a narrow continuous segment.
+3. Finite-difference curl and vorticity confinement.
+4. Divergence, 24 Jacobi pressure iterations from zero, pressure-gradient removal.
+5. Forward dye advection followed by limited MacCormack error correction, decay
+   and distance-scaled dye injection. Departure-cell extrema clamp corrected
+   values to prevent overshoot/negative dye. Hardware LINEAR filtering applies
+   throughout, including presentation upscaling.
+
+Velocity is in flow cells/second; high-resolution dye shares normalized UVs and
+uses flow dimensions for backtrace distance and dye dimensions for its limiter.
+Reflected wall-normal velocity, clamped pressure and zero wall-normal projected
+velocity implement approximate closed boundaries. The collocated pressure solve
+reduces, rather than eliminates, divergence. MacCormack is limited and not globally
+mass-conservative; physical 3D smoke, combustion and sub-cell turbulence are not
+solved. Vorticity confinement restores small-scale spin lost to interpolation;
+Gaussian source shape, rainbow palette and optical density shading are visual
+models, not extra fluid equations. No procedural noise fakes motion.
+
+Developer tuning is in `core/simulation.js`: viscosity 0.15 cells²/s, velocity
+dissipation 0.18/s, dye dissipation 0.65/s and confinement 8. Constructor overrides
+are range-validated; viscosity <=3 keeps nu*dt <=0.125, below the explicit 0.25
+stability limit. Zero viscosity skips its pass. There is no new preferences UI.
+
+Wall time is bounded to two <=1/24 s substeps (headroom for 30 Hz timer jitter).
+Pointer speed uses actual observed elapsed time, including idle polling, and is
+capped at 120 cells/s. Stationary samples inject nothing. Velocity is capped at
+180 cells/s before projection. After ten seconds without motion, already-decaying
+dye is cleared exactly and GPU work stops. A cheap 80 ms observer wakes it.
+
+The timer targets ~60 Hz, subtracting submission time from the next wait; 30
+consecutive active callbacks taking >8 ms to submit or spaced >25 ms trigger a
+sticky ~30 Hz fallback until session restart. These are overload heuristics, not
+GPU timings or measured FPS. GJS submits a bounded pass graph on Shell's thread;
+all cell calculations run in shaders. Driver stalls can still affect Shell.
+No runtime readback/finish is used; `flush()` submits the final dye framebuffer.
+Native object release remains GJS-GC-dependent. Background actors, Wayland cursor
+tracking, multi-monitor layout and lifecycle paths are retained. See `TESTING.md`.
 
 ## Original architecture investigation and probe history
 

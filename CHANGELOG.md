@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0-alpha.2 — 2026-10-27 (fluid-quality test prerelease)
+
+* Audited probe versus alpha physics and confirmed explicit persistent multipass
+  targets in source; actual GNOME multipass execution remains a laptop gate.
+* Doubled dye resolution independently of the pressure/velocity grid and added
+  limited MacCormack dye transport to reduce first-order numerical smearing.
+* Added stable, configurable explicit viscosity and per-second dissipation tuning;
+  narrowed continuous sources and strengthened timestep-scaled pointer coupling.
+* Removed faint-density gamma amplification; kept opaque pure-black presentation.
+* Corrected post-idle pointer timing; added submission-aware scheduling and a
+  sustained-overload 30 Hz fallback. No laptop performance claim.
+* Added automated no-input dye displacement/shape tests and exact idle clear tests.
+  Test build only; visual acceptance and final release await laptop testing.
+
 ## 0.2.0-alpha.1 — 2026-10-27 (first fluid prerelease)
 
 * Replaced the two-pass feedback trail with GPU velocity, pressure and RGB

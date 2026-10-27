@@ -47,6 +47,7 @@ class GPU:
         assert bind(self.egl, "eglMakeCurrent", UINT, PTR, PTR, PTR, PTR)(
             self.display, None, None, self.context)
         self.functions = {}
+        self.dimensions = {}
         signatures = {
             "glCreateShader": (UINT, UINT),
             "glShaderSource": (None, UINT, INT, C.POINTER(C.c_char_p), C.POINTER(INT)),
@@ -119,6 +120,7 @@ class GPU:
             precision highp float;
             uniform sampler2D cogl_sampler0;
             uniform sampler2D cogl_sampler1;
+            uniform sampler2D cogl_sampler2;
             in vec2 fs_uv;
             out vec4 cogl_color_out;
         """ + shader["declarations"] + "\nvoid main() {\n" + shader["body"] + "\n}"
@@ -137,10 +139,12 @@ class GPU:
             self.call("glDeleteShader", item)
         return program
 
-    def target(self, data=None):
+    def target(self, data=None, width=None, height=None):
+        width, height = width or self.width, height or self.height
         texture, framebuffer = UINT(), UINT()
         self.call("glGenTextures", 1, C.byref(texture))
         self.call("glBindTexture", 0x0DE1, texture)
+        self.dimensions[texture.value] = (width, height)
         for parameter, value in [(0x2801, 0x2601), (0x2800, 0x2601),
                                  (0x2802, 0x812F), (0x2803, 0x812F)]:
             self.call("glTexParameteri", 0x0DE1, parameter, value)
@@ -152,10 +156,12 @@ class GPU:
         return texture.value, framebuffer.value
 
     def upload(self, texture, data=None):
-        data = data if data is not None else [0.0] * (self.width * self.height * 4)
+        width, height = self.dimensions[texture]
+        data = data if data is not None else [0.0] * (width * height * 4)
+        assert len(data) == width * height * 4
         values = (FLOAT * len(data))(*data)
         self.call("glBindTexture", 0x0DE1, texture)
-        self.call("glTexImage2D", 0x0DE1, 0, 0x881A, self.width, self.height,
+        self.call("glTexImage2D", 0x0DE1, 0, 0x881A, width, height,
                   0, 0x1908, 0x1406, values)
 
     def draw(self, name, output, inputs, dt=1 / 60, **uniforms):
@@ -163,21 +169,29 @@ class GPU:
         program = self.programs[name]
         self.call("glUseProgram", program)
         self.call("glBindFramebuffer", 0x8D40, output[1])
+        self.call("glViewport", 0, 0, *self.dimensions[output[0]])
         for i, target in enumerate(inputs):
             self.call("glActiveTexture", 0x84C0 + i)
             self.call("glBindTexture", 0x0DE1, target[0])
             location = self.call("glGetUniformLocation", program, f"cogl_sampler{i}".encode())
             self.call("glUniform1i", location, i)
-        for key, values in dict(fs_size=[self.width, self.height], fs_dt=[dt], **uniforms).items():
+        defaults = dict(fs_size=[self.width, self.height], fs_dt=[dt],
+                        fs_dye_size=list(self.dimensions[inputs[1][0]] if len(inputs) > 1
+                                         else self.dimensions[output[0]]),
+                        fs_velocity_decay=[0.18], fs_dye_decay=[0.65],
+                        fs_viscosity=[0.15], fs_vorticity=[8])
+        defaults.update(uniforms)
+        for key, values in defaults.items():
             location = self.call("glGetUniformLocation", program, key.encode())
             self.call(f"glUniform{len(values)}fv", location, 1, (FLOAT * len(values))(*values))
         self.call("glDrawArrays", 0x0004, 0, 3)
         assert self.call("glGetError") == 0, f"GL error after {name}"
 
     def read(self, target):
-        result = (FLOAT * (self.width * self.height * 4))()
+        width, height = self.dimensions[target[0]]
+        result = (FLOAT * (width * height * 4))()
         self.call("glBindFramebuffer", 0x8D40, target[1])
-        self.call("glReadPixels", 0, 0, self.width, self.height, 0x1908, 0x1406, result)
+        self.call("glReadPixels", 0, 0, width, height, 0x1908, 0x1406, result)
         assert self.call("glGetError") == 0, "Float readback failed"
         assert all(math.isfinite(value) for value in result), "Non-finite simulation state"
         return list(result)
@@ -195,9 +209,16 @@ def rms(values):
 def validate(gpu):
     w, h = gpu.width, gpu.height
     velocity = [gpu.target(), gpu.target()]
-    dye = [gpu.target(), gpu.target()]
+    dw, dh = w * 2, h * 2
+    dye = [gpu.target(width=dw, height=dh), gpu.target(width=dw, height=dh)]
+    dye_forward = gpu.target(width=dw, height=dh)
     pressure = [gpu.target(), gpu.target()]
     curl, divergence, scratch = gpu.target(), gpu.target(), gpu.target()
+
+    def transport(dt=1 / 60, **injection):
+        gpu.draw("advectDye", dye_forward, [velocity[0], dye[0]], dt)
+        gpu.draw("correctDye", dye[1], [velocity[0], dye[0], dye_forward], dt, **injection)
+        dye.reverse()
 
     def project(iterations=24):
         gpu.draw("divergence", divergence, [velocity[0]])
@@ -251,15 +272,49 @@ def validate(gpu):
     gpu.upload(velocity[0][0])
     decays = []
     for fps in [30, 60]:
-        gpu.upload(dye[0][0], [0.5, 0.25, 0.1, 1] * (w * h))
+        gpu.upload(dye[0][0], [0.5, 0.25, 0.1, 1] * (dw * dh))
         for _ in range(fps):
-            gpu.draw("advectDye", dye[1], [velocity[0], dye[0]], 1 / fps,
+            transport(1 / fps,
                      fs_emit=[0], fs_radius=[2], fs_segment=[0, 0, 0, 0], fs_color=[1, 0, 0])
-            dye.reverse()
         decays.append(gpu.read(dye[0])[3])
     assert abs(decays[0] - decays[1]) < 0.025
-    assert all(abs(value - math.exp(-0.7)) < 0.025 for value in decays)
+    assert all(abs(value - math.exp(-0.65)) < 0.025 for value in decays)
     print(f"One-second RGBA16F dye fade, 30/60 Hz: {decays}")
+
+    # A dye packet in persistent uniform flow MUST travel, not just fade. Compare
+    # normalized centroid and density shape so dissipation alone cannot pass.
+    gpu.upload(velocity[0][0], [12, 0, 0, 1] * (w * h))
+    packet = []
+    for y in range(dh):
+        for x in range(dw):
+            density = math.exp(-((x - dw * 0.3) ** 2 + (y - dh * 0.5) ** 2) / 18)
+            packet.extend([density, density * 0.3, 0, density])
+    gpu.upload(dye[0][0], packet)
+
+    def centroid(snapshot):
+        density = snapshot[3::4]
+        mass = sum(density)
+        return (sum((i % dw) * v for i, v in enumerate(density)) / mass,
+                sum((i // dw) * v for i, v in enumerate(density)) / mass)
+
+    start = centroid(gpu.read(dye[0]))
+    for _ in range(60):
+        transport(fs_emit=[0], fs_radius=[2], fs_segment=[0, 0, 0, 0],
+                  fs_color=[1, 0, 0], fs_amount=[0])
+    end = centroid(gpu.read(dye[0]))
+    assert abs(end[0] - start[0] - 24) < 1, (start, end)
+    assert abs(end[1] - start[1]) < 0.1, (start, end)
+    print(f"No-input dye packet centroid, +1s: {start} -> {end} (expected +24 dye cells)")
+
+    # Explicit viscosity must diffuse momentum while preserving uniform fields.
+    gpu.draw("diffuseVelocity", velocity[1], [velocity[0]])
+    assert abs(gpu.read(velocity[1])[4 * (w * (h // 2) + w // 2)] - 12) < 0.02
+    impulse_field = [0.0] * (w * h * 4)
+    impulse_field[4 * (w * (h // 2) + w // 2)] = 12
+    gpu.upload(velocity[0][0], impulse_field)
+    gpu.draw("diffuseVelocity", velocity[1], [velocity[0]], fs_viscosity=[3])
+    diffused = gpu.read(velocity[1])[0::4]
+    assert 0 < max(diffused) < 12 and min(diffused) >= 0
 
     for target in velocity + dye:
         gpu.upload(target[0])
@@ -271,6 +326,8 @@ def validate(gpu):
                    0.5 + 0.18 * math.cos(angle + 0.08), 0.5 + 0.18 * math.sin(angle + 0.08)]
         injection = dict(fs_segment=segment, fs_emit=[int(frame < 120)], fs_radius=[2.5])
         impulse = [(segment[2] - segment[0]) * w * 60, (segment[3] - segment[1]) * h * 60]
+        gpu.draw("diffuseVelocity", velocity[1], [velocity[0]])
+        velocity.reverse()
         gpu.draw("advectVelocity", velocity[1], [velocity[0], dye[0]],
                  **injection, fs_impulse=impulse)
         velocity.reverse()
@@ -278,8 +335,8 @@ def validate(gpu):
         gpu.draw("confine", velocity[1], [velocity[0], curl])
         velocity.reverse()
         project()
-        gpu.draw("advectDye", dye[1], [velocity[0], dye[0]], **injection, fs_color=[1, 0.25, 0.6])
-        dye.reverse()
+        transport(**injection, fs_color=[1, 0.25, 0.6],
+                  fs_amount=[0.45 * min(1, math.hypot(*impulse) / 60 / 2.5)])
         if frame in [119, 179, 239]:
             snapshots.append(gpu.read(dye[0]))
             speed = gpu.read(velocity[0])
@@ -287,13 +344,23 @@ def validate(gpu):
     densities = [sum(snapshot[3::4]) for snapshot in snapshots]
     assert densities[0] > densities[1] > densities[2] > 0, densities
     assert rms([a - b for a, b in zip(snapshots[0], snapshots[1])]) > 0.005
+    centers = [centroid(snapshot) for snapshot in snapshots]
+    assert math.dist(centers[0], centers[1]) > 0.5, centers
+    normalized = [[v / mass for v in snap[3::4]] for snap, mass in zip(snapshots, densities)]
+    shape_change = sum(abs(a - b) for a, b in zip(normalized[0], normalized[1]))
+    assert shape_change > 0.1, shape_change
     gpu.draw("curl", curl, [velocity[0]])
     assert max(abs(value) for value in gpu.read(curl)[0::4]) > 0.01
     gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
     displayed = gpu.read(scratch)
     assert all(value == 1 for value in displayed[3::4])
     print(f"Smoke density totals after emission / +1s / +2s: {[round(v, 3) for v in densities]}")
-    print("PASS: all eight shaders compile/link; projection, walls, fade, evolving curls and finite-state checks")
+    print(f"After input stops: dye centroids {centers}; normalized shape change L1 {shape_change:.3f}")
+    # Zero dye presents exact black, including opaque alpha.
+    gpu.upload(dye[0][0])
+    gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
+    assert all(v == 0 for i, v in enumerate(gpu.read(scratch)) if i % 4 != 3)
+    print("PASS: all ten shaders; projection, walls, viscosity, fade, post-input transport, curls, finite state, black")
 
 
 if __name__ == "__main__":

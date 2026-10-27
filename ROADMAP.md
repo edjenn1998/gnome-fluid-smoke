@@ -19,7 +19,7 @@ Implemented GPU velocity/dye advection, bounded timestep, buoyancy, divergence,
 24-iteration pressure projection, vorticity confinement and rainbow injection.
 Offscreen checks cover finite values, pressure residual/divergence reduction,
 frame-rate decay and evolving curls. The ten-second idle clear remains in place.
-Numerical diffusion is present; physical viscosity is not separately solved.
+Alpha.2 adds explicit viscosity and finer, limited MacCormack dye transport.
 Next: validate actual smoke appearance and multi-texture Cogl execution on the
 laptop, tune visuals and profile pressure/pass budgets before UI expansion.
 
