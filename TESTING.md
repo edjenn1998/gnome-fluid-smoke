@@ -1,5 +1,33 @@
 # Validation record and acceptance checklist
 
+## 0.2.0-alpha.3 — 2026-10-27
+
+Compared the two supplied desktop screenshots (thin jagged colored paths) with
+`testphotos/what it should look like.png` (broad luminous folds and wisps). Tuned
+source widths, additive momentum, buoyancy, dissipation, confinement and shading.
+
+All 18 JS tests and ten GLSL 1.20 shader checks pass. Offscreen llvmpipe checks
+using the new default parameters pass: one-second dye fade at 30/60 Hz is
+**0.734375 / 0.729004** (ideal 0.740818); no-input packet displacement remains
+**23.844 dye cells** (expected 24). Full-solver density totals at stop / +1s / +2s
+are **17530.153 / 15478.984 / 11731.218**. First no-input second normalized shape
+change is **1.156**. Projection checks are unchanged; empty dye stays exact black.
+
+`tools/preview_gpu.py` records production `FluidSimulation.step()` commands via a
+minimal JS recorder, then executes those shaders/uniforms at 320×180 flow and
+640×360 dye resolution. A moving sweep followed by a pause produces four PNGs.
+Visual review shows broad luminous folds and curled edges rather than thin lines.
+This establishes offscreen appearance for that path, not reference equivalence
+or GNOME/Cogl integration. Fine wisps and target-device performance remain open.
+
+```sh
+# Existing output directory; same optional EGL environment as below when needed.
+python3 tools/preview_gpu.py /tmp/opencode
+```
+
+The preview files are `smoke-059.png`, `smoke-089.png`, `smoke-119.png` and
+`smoke-179.png`. Tools and screenshots are excluded from the extension ZIP.
+
 ## 0.2.0-alpha.2 — 2026-10-27
 
 Test prerelease only. No GNOME/GJS session is available in this environment.
@@ -115,8 +143,8 @@ eslint --no-eslintrc --env es6 \
 
 ## Laptop acceptance checklist — new alpha remains untested
 
-Install using `README.md`, log out/in, enable and verify version **4** /
-`0.2.0-alpha.2`. Record Shell version, Wayland status, GPU/driver and display layout.
+Install using `README.md`, log out/in, enable and verify version **5** /
+`0.2.0-alpha.3`. Record Shell version, Wayland status, GPU/driver and display layout.
 Watch Shell logs while enabling/disabling.
 
 ### Appearance and simulation

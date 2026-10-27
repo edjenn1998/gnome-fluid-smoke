@@ -90,6 +90,10 @@ class GPU:
             "import * as s from './extension/gpu/shaders.js'; console.log(JSON.stringify(s));",
         ], cwd=ROOT))
         self.programs = {name: self.program(shader) for name, shader in self.shaders.items()}
+        self.parameters = json.loads(subprocess.check_output([
+            "node", "--input-type=module", "--eval",
+            "import {DEFAULT_PARAMETERS as p} from './extension/core/simulation.js'; console.log(JSON.stringify(p));",
+        ], cwd=ROOT))
         self.call("glViewport", 0, 0, width, height)
 
     def call(self, name, *args):
@@ -178,8 +182,10 @@ class GPU:
         defaults = dict(fs_size=[self.width, self.height], fs_dt=[dt],
                         fs_dye_size=list(self.dimensions[inputs[1][0]] if len(inputs) > 1
                                          else self.dimensions[output[0]]),
-                        fs_velocity_decay=[0.18], fs_dye_decay=[0.65],
-                        fs_viscosity=[0.15], fs_vorticity=[8])
+                         fs_velocity_decay=[self.parameters['velocityDissipation']],
+                         fs_dye_decay=[self.parameters['dyeDissipation']],
+                         fs_viscosity=[self.parameters['viscosity']],
+                         fs_vorticity=[self.parameters['vorticity']])
         defaults.update(uniforms)
         for key, values in defaults.items():
             location = self.call("glGetUniformLocation", program, key.encode())
@@ -278,7 +284,7 @@ def validate(gpu):
                      fs_emit=[0], fs_radius=[2], fs_segment=[0, 0, 0, 0], fs_color=[1, 0, 0])
         decays.append(gpu.read(dye[0])[3])
     assert abs(decays[0] - decays[1]) < 0.025
-    assert all(abs(value - math.exp(-0.65)) < 0.025 for value in decays)
+    assert all(abs(value - math.exp(-gpu.parameters['dyeDissipation'])) < 0.025 for value in decays)
     print(f"One-second RGBA16F dye fade, 30/60 Hz: {decays}")
 
     # A dye packet in persistent uniform flow MUST travel, not just fade. Compare
@@ -324,19 +330,20 @@ def validate(gpu):
         angle = frame * 0.08
         segment = [0.5 + 0.18 * math.cos(angle), 0.5 + 0.18 * math.sin(angle),
                    0.5 + 0.18 * math.cos(angle + 0.08), 0.5 + 0.18 * math.sin(angle + 0.08)]
-        injection = dict(fs_segment=segment, fs_emit=[int(frame < 120)], fs_radius=[2.5])
+        radius = max(4, min(w, h) * 0.055)
+        injection = dict(fs_segment=segment, fs_emit=[int(frame < 120)], fs_radius=[radius])
         impulse = [(segment[2] - segment[0]) * w * 60, (segment[3] - segment[1]) * h * 60]
         gpu.draw("diffuseVelocity", velocity[1], [velocity[0]])
         velocity.reverse()
         gpu.draw("advectVelocity", velocity[1], [velocity[0], dye[0]],
-                 **injection, fs_impulse=impulse)
+                 **{**injection, 'fs_radius': [radius * 0.7]}, fs_impulse=impulse)
         velocity.reverse()
         gpu.draw("curl", curl, [velocity[0]])
         gpu.draw("confine", velocity[1], [velocity[0], curl])
         velocity.reverse()
         project()
         transport(**injection, fs_color=[1, 0.25, 0.6],
-                  fs_amount=[0.45 * min(1, math.hypot(*impulse) / 60 / 2.5)])
+                   fs_amount=[3 * min(1, math.hypot(*impulse) / 60 / radius)])
         if frame in [119, 179, 239]:
             snapshots.append(gpu.read(dye[0]))
             speed = gpu.read(velocity[0])

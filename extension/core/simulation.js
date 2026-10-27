@@ -9,10 +9,10 @@ export const MAX_SUBSTEPS = 2;
 // Developer tuning, not a preferences UI. Viscosity is cells²/second; decay
 // coefficients are per second. Explicit diffusion requires nu * dt <= 1/4.
 export const DEFAULT_PARAMETERS = Object.freeze({
-    viscosity: 0.15,
-    velocityDissipation: 0.18,
-    dyeDissipation: 0.65,
-    vorticity: 8,
+    viscosity: 0.4,
+    velocityDissipation: 0.25,
+    dyeDissipation: 0.3,
+    vorticity: 3,
 });
 
 export function simulationParameters(overrides = {}) {

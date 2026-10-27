@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0-alpha.3 — 2026-10-27 (screenshot-guided test prerelease)
+
+* Compared supplied thin, jagged trails with the broad luminous reference plume.
+* Broadened dye injection around a narrower additive momentum jet, exposing the
+  rolling shear instead of drawing a narrow cursor line.
+* Reduced buoyancy and grid-scale confinement, increased viscosity, slowed dye
+  decay and accelerated color cycling. Added a bounded four-sample soft halo.
+* Added an offscreen PNG preview that replays the production JS pass graph and
+  uniforms through the real shaders. Reviewed sweep/stop frames for broad folds
+  and post-input curls; exact reference matching still needs GNOME testing.
+* Published as a test prerelease, numeric version 5; GNOME laptop testing remains open.
+
 ## 0.2.0-alpha.2 — 2026-10-27 (fluid-quality test prerelease)
 
 * Audited probe versus alpha physics and confirmed explicit persistent multipass

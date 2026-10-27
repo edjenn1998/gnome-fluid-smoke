@@ -39,8 +39,11 @@ export const advectVelocity = {
         vec2 back = bounded(uv - fs_dt * v / fs_size);
         v = velocity(back) * exp(-fs_velocity_decay * fs_dt);
         float density = texture2D(cogl_sampler1, uv).a;
-        v.y -= min(density, 3.0) * 18.0 * fs_dt;
-        v += (fs_impulse - v) * splat(uv) * (1.0 - exp(-30.0 * fs_dt));
+        // Pointer momentum drives the plume; gentle buoyancy only lifts old dye.
+        v.y -= min(density, 3.0) * 3.0 * fs_dt;
+        // Add momentum rather than painting a target velocity over the existing
+        // flow. This lets successive strokes roll up and stir earlier smoke.
+        v += fs_impulse * splat(uv) * (1.0 - exp(-18.0 * fs_dt));
         float speed = length(v);
         v *= min(1.0, 180.0 / max(speed, 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
@@ -178,13 +181,22 @@ export const correctDye = {
 };
 
 export const presentation = {
-    declarations: 'uniform float fs_opacity;',
+    declarations: 'uniform float fs_opacity; uniform vec2 fs_dye_size;',
     body: `
-        vec4 dye = texture2D(cogl_sampler0, cogl_tex_coord_in[0].xy);
+        vec2 uv = cogl_tex_coord_in[0].xy;
+        vec4 dye = texture2D(cogl_sampler0, uv);
         vec3 tint = dye.rgb / max(dye.a, 0.0001);
-        float opacity = 1.0 - exp(-1.6 * dye.a);
+        float opacity = 1.0 - exp(-2.4 * dye.a);
         // Do not amplify near-zero cell/interpolation errors with gamma < 1.
         vec3 color = max(tint * opacity, vec3(0.0));
+        // A small, bounded halo gives luminous folds without lifting the black
+        // background. Its radius tracks dye resolution, not monitor pixels.
+        vec2 h = 6.0 / fs_dye_size;
+        vec3 halo = (texture2D(cogl_sampler0, uv + vec2(h.x, 0.0)).rgb
+            + texture2D(cogl_sampler0, uv - vec2(h.x, 0.0)).rgb
+            + texture2D(cogl_sampler0, uv + vec2(0.0, h.y)).rgb
+            + texture2D(cogl_sampler0, uv - vec2(0.0, h.y)).rgb) * 0.25;
+        color += 0.12 * (vec3(1.0) - exp(-halo));
         cogl_color_out = vec4(color * fs_opacity, fs_opacity);
     `,
 };

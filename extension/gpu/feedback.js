@@ -93,7 +93,9 @@ export class FluidSimulation {
         const steps = planSteps(elapsed, segment, this.width, this.height);
         const color = [0, 2.0944, 4.1888].map(phase => 0.55 + 0.45 * Math.cos(hue + phase));
         for (const {dt, segment: part, impulse} of steps) {
-            const radius = Math.max(1.25, Math.min(this.width, this.height) * 0.009);
+            // A broad dye source straddles the narrower momentum jet, exposing
+            // its shear/rolling edges instead of drawing a one-cell cursor line.
+            const radius = Math.max(4, Math.min(this.width, this.height) * 0.055);
             const injection = {
                 fs_segment: part ?? [0, 0, 0, 0],
                 fs_emit: [part ? 1 : 0],
@@ -105,7 +107,7 @@ export class FluidSimulation {
                 this.velocity.reverse();
             }
             this.draw('advectVelocity', this.velocity[1], [this.velocity[0], this.dye[0]], dt,
-                {...injection, fs_impulse: impulse,
+                {...injection, fs_radius: [radius * 0.7], fs_impulse: impulse,
                     fs_velocity_decay: [this.parameters.velocityDissipation]});
             this.velocity.reverse();
             this.draw('curl', this.curl, [this.velocity[0]], dt);
@@ -126,7 +128,7 @@ export class FluidSimulation {
             this.draw('correctDye', this.dye[1],
                 [this.velocity[0], this.dye[0], this.dyeForward], dt,
                 {...injection, fs_color: color, fs_dye_decay: [this.parameters.dyeDissipation],
-                    fs_amount: [0.45 * Math.min(1, Math.hypot(...impulse) * dt / radius)]});
+                    fs_amount: [3 * Math.min(1, Math.hypot(...impulse) * dt / radius)]});
             this.dye.reverse();
         }
         if (steps.length)
@@ -137,6 +139,7 @@ export class FluidSimulation {
     presentationPipeline(opacity) {
         const pipeline = this.pipelines.presentation;
         uniform(pipeline, 'fs_opacity', [opacity / 255]);
+        uniform(pipeline, 'fs_dye_size', [this.dyeWidth, this.dyeHeight]);
         return pipeline;
     }
 

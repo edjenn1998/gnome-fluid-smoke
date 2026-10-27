@@ -65,7 +65,7 @@ export class MonitorSurface {
             this.reset();
             return;
         }
-        this.probe.step(dt, segment, now * 0.7);
+        this.probe.step(dt, segment, now * 1.8);
         this.content.invalidate();
     }
 
