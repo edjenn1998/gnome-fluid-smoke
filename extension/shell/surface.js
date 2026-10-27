@@ -5,7 +5,7 @@
 
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
-import {FeedbackProbe} from '../gpu/feedback.js';
+import {FluidSimulation} from '../gpu/feedback.js';
 import {probeDimensions} from '../core/coordinates.js';
 
 const ProbeContent = GObject.registerClass({
@@ -25,7 +25,7 @@ export class MonitorSurface {
         this.lastFrame = 0;
         this.active = false;
         const [width, height] = probeDimensions(monitor);
-        this.probe = new FeedbackProbe(context, width, height);
+        this.probe = new FluidSimulation(context, width, height);
     }
 
     initialize(parent) {

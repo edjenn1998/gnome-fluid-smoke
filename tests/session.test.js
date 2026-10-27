@@ -20,13 +20,15 @@ class Emitter {
     }
 }
 
-async function fixture() {
+async function fixture({wayland = true} = {}) {
     const timers = new Map();
     const surfaces = [];
+    const actors = [];
     let point = {x: 100, y: 100};
     let time = 1;
+    const errors = [];
     class Actor {
-        constructor(props) { Object.assign(this, props); }
+        constructor(props) { Object.assign(this, props); actors.push(this); }
         destroy() { this.destroyed = true; }
     }
     const background = Object.assign(new Emitter(), {
@@ -41,6 +43,7 @@ async function fixture() {
     const settings = Object.assign(new Emitter(), {reducedMotion: 0});
     const display = Object.assign(new Emitter(), {get_monitor_in_fullscreen: () => false});
     const shellGlobal = {
+        context: {get_wayland_compositor: () => wayland ? {} : null},
         backend: {get_cursor_tracker: () => ({get_pointer: () => [point, 0]})},
         stage: {context: {get_backend: () => ({get_cogl_context: () => ({})})}},
         display,
@@ -55,7 +58,8 @@ async function fixture() {
         update(_now, segment, suspended) { this.active = !!segment && !suspended; }
         destroy() { this.destroyed = true; }
     }
-    const context = vm.createContext({global: shellGlobal, console});
+    const context = vm.createContext({global: shellGlobal,
+        console: {error: message => errors.push(message)}});
     const modules = {
         'gi://Clutter': {default: {Actor}},
         'gi://GLib': {default: {
@@ -66,7 +70,6 @@ async function fixture() {
             },
             Source: {remove: id => assert.ok(timers.delete(id))},
         }},
-        'gi://Meta': {default: {is_wayland_compositor: () => true}},
         'gi://St': {default: {Settings: {get: () => settings}, ReducedMotion: {REDUCE: 1}}},
         'resource:///org/gnome/shell/ui/main.js': {layoutManager: layout, screenShield: shield, overview},
         './surface.js': {MonitorSurface: Surface},
@@ -86,8 +89,20 @@ async function fixture() {
         }, {context});
     });
     await module.evaluate();
+    const entry = new vm.SourceTextModule(await readFile(
+        new URL('../extension/extension.js', import.meta.url), 'utf8'), {context});
+    await entry.link(specifier => {
+        if (specifier === './shell/session.js')
+            return module;
+        assert.equal(specifier, 'resource:///org/gnome/shell/extensions/extension.js');
+        return new vm.SyntheticModule(['Extension'], function () {
+            this.setExport('Extension', class {});
+        }, {context});
+    });
+    await entry.evaluate();
     return {
         Session: module.namespace.ProbeSession, timers, surfaces, layout, shield, settings, display, overview,
+        Extension: entry.namespace.default, shellGlobal, errors, actors,
         emitters: [background, layout, shield, settings, display, overview],
         move(x, y) { point = {x, y}; time += 0.017; },
         fire() {
@@ -144,5 +159,69 @@ test('partial monitor initialization failure rolls back resources', async () => 
     assert.throws(() => session.rebuild());
     assert.equal(f.timers.size, 0);
     assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
+    session.destroy();
+});
+
+test('null Wayland compositor rejects startup before allocating resources', async () => {
+    const f = await fixture({wayland: false});
+    const session = new f.Session();
+    assert.throws(() => session.start(), /requires GNOME 51 Wayland/);
+    session.destroy();
+    session.destroy();
+    assert.equal(f.surfaces.length, 0);
+    assert.equal(f.timers.size, 0);
+    assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
+});
+
+test('extension enable failure rolls back signals and background actors; disable is repeatable', async () => {
+    const f = await fixture();
+    const extension = new f.Extension();
+    f.shellGlobal.stage.context.get_backend = () => { throw new Error('startup context failure'); };
+    assert.throws(() => extension.enable(), /startup context failure/);
+    assert.equal(extension._session, null);
+    assert.equal(f.timers.size, 0);
+    assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
+    assert.equal(f.actors.length, 1);
+    assert.ok(f.actors.every(actor => actor.destroyed));
+    extension.disable();
+    extension.disable();
+});
+
+test('Cogl context failure during hotplug tears down the session', async () => {
+    const f = await fixture();
+    const session = new f.Session();
+    session.start();
+    f.shellGlobal.stage.context.get_backend = () => { throw new Error('context failure'); };
+    f.layout.emit('monitors-changed');
+    assert.match(f.errors[0], /context failure/);
+    assert.equal(f.timers.size, 0);
+    assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
+    assert.ok(f.surfaces.every(surface => surface.destroyed));
+    session.destroy();
+});
+
+test('reset failure from a suspension signal tears down the session', async () => {
+    const f = await fixture();
+    const session = new f.Session();
+    session.start();
+    f.surfaces[0].reset = () => { throw new Error('GPU clear failure'); };
+    f.shield.emit('active-changed');
+    assert.match(f.errors[0], /GPU clear failure/);
+    assert.equal(f.timers.size, 0);
+    assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
+    assert.ok(f.surfaces.every(surface => surface.destroyed));
+    session.destroy();
+});
+
+test('pointer polling failure stops the timer and tears down the session', async () => {
+    const f = await fixture();
+    const session = new f.Session();
+    session.start();
+    session.tracker.get_pointer = () => { throw new Error('pointer failure'); };
+    f.fire();
+    assert.match(f.errors[0], /pointer failure/);
+    assert.equal(f.timers.size, 0);
+    assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
+    assert.ok(f.surfaces.every(surface => surface.destroyed));
     session.destroy();
 });

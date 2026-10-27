@@ -8,7 +8,7 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = [
-    "metadata.json", "extension.js", "core/coordinates.js", "gpu/shaders.js",
+    "metadata.json", "extension.js", "core/coordinates.js", "core/simulation.js", "gpu/shaders.js",
     "gpu/feedback.js", "shell/surface.js", "shell/session.js",
 ]
 
@@ -27,8 +27,10 @@ def main():
     with ZipFile(output) as archive:
         assert archive.testzip() is None
         assert set(archive.namelist()) == {*FILES, "LICENSE"}
+    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    output.with_name("SHA256SUMS").write_text(f"{digest}  {output.name}\n")
     print(f"Package: {output}")
-    print(f"SHA256: {hashlib.sha256(output.read_bytes()).hexdigest()}")
+    print(f"SHA256: {digest}")
 
 
 if __name__ == "__main__":

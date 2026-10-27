@@ -5,7 +5,6 @@
 
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
-import Meta from 'gi://Meta';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {locateMonitor, movementSegment} from '../core/coordinates.js';
@@ -20,8 +19,9 @@ export class ProbeSession {
     }
 
     start() {
-        if (!Meta.is_wayland_compositor())
-            throw new Error('Fluid Smoke architecture probe requires GNOME 51 Wayland');
+        // GNOME 51 exposes the compositor through the Shell-owned Meta.Context.
+        if (global.context.get_wayland_compositor() === null)
+            throw new Error('Fluid Smoke requires GNOME 51 Wayland');
         this.tracker = global.backend.get_cursor_tracker();
         this.stSettings = St.Settings.get();
         // Isolated private Shell dependency: the real desktop background group.
@@ -42,7 +42,18 @@ export class ProbeSession {
     }
 
     watch(object, signal, callback) {
-        this.signals.push([object, object.connect(signal, callback)]);
+        this.signals.push([object, object.connect(signal, () => {
+            try {
+                callback();
+            } catch (error) {
+                this.stopAfterError(error);
+            }
+        })]);
+    }
+
+    stopAfterError(error) {
+        console.error(`Fluid Smoke stopped: ${error.stack ?? error.message}`);
+        this.destroy();
     }
 
     schedule(interval) {
@@ -57,8 +68,7 @@ export class ProbeSession {
                 this.tick();
             } catch (error) {
                 // A failed GPU/GI probe must stop, not throw on every timer tick.
-                console.error(`Fluid Smoke probe stopped: ${error.message}`);
-                this.destroy();
+                this.stopAfterError(error);
             }
             return GLib.SOURCE_REMOVE;
         });
@@ -81,18 +91,18 @@ export class ProbeSession {
             surface.destroy();
         this.surfaces = [];
         this.previous = null;
-        const context = global.stage.context.get_backend().get_cogl_context();
         try {
+            const context = global.stage.context.get_backend().get_cogl_context();
             for (const monitor of Main.layoutManager.monitors) {
                 const surface = new MonitorSurface(monitor, context);
                 this.surfaces.push(surface);
                 surface.initialize(this.group);
             }
+            this.refresh();
         } catch (error) {
             this.destroy();
             throw error;
         }
-        this.refresh();
     }
 
     tick() {

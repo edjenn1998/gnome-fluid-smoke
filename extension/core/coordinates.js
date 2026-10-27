@@ -24,7 +24,7 @@ export function movementSegment(previous, current, monitor) {
 }
 
 export function probeDimensions(monitor) {
-    // Deliberately tiny until compositor safety and float feedback are verified.
+    // Conservative grid: pressure projection runs many passes each frame.
     const scale = Math.min(0.5, 384 / Math.max(monitor.width, monitor.height));
     return [Math.max(1, Math.round(monitor.width * scale)),
         Math.max(1, Math.round(monitor.height * scale))];

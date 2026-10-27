@@ -5,20 +5,23 @@
 Candidate A uses Cogl owned render targets and custom Clutter content. Runtime
 feasibility remains unproven. Consult `ARCHITECTURE.md` for evidence and risks.
 
-## 2. Technical proof — packaged; laptop acceptance required
+## 2. Technical proof — user reports working poc.2 visuals
 
-Run `TESTING.md` on CachyOS GNOME 51.1. Required evidence: black background below
+The user reports the probe works and looks cool, but not like smoke. Full
+`TESTING.md` acceptance on CachyOS GNOME 51.1 is still pending: black background below
 windows/icons, GPU animated feedback, signed float survival, pointer tracking over
 windows, correct multi-monitor geometry, no input interference and clean repeated
 disable. Investigate any failed gate before extending the renderer.
 
-## 3. Genuine fluid dynamics — blocked by gate 2
+## 3. Fluid dynamics — first alpha implemented; laptop validation pending
 
-Implement GPU velocity/dye advection, bounded timestep, viscosity, divergence,
-pressure projection, vorticity confinement and smooth rainbow injection. Add
-numerical validation: finite values, pressure convergence/divergence reduction,
-different frame-rate equivalence and 10-second dissipation. Tune visuals and
-profile draw-call/pressure budgets before UI expansion. No particle substitution.
+Implemented GPU velocity/dye advection, bounded timestep, buoyancy, divergence,
+24-iteration pressure projection, vorticity confinement and rainbow injection.
+Offscreen checks cover finite values, pressure residual/divergence reduction,
+frame-rate decay and evolving curls. The ten-second idle clear remains in place.
+Numerical diffusion is present; physical viscosity is not separately solved.
+Next: validate actual smoke appearance and multi-texture Cogl execution on the
+laptop, tune visuals and profile pressure/pass budgets before UI expansion.
 
 ## 4. Lifecycle / multi-monitor production hardening
 
@@ -56,5 +59,6 @@ Replace probe instructions with tested installation and actual settings docs.
 Add authentic screenshots/demo and measured compatibility. Review all code,
 dependencies and licensing, confirm GitHub publication, inspect status/diff/log
 and secrets before milestone commits. Public repository: intended
-`edjenn1998/gnome-fluid-smoke`. No release or EGO submission until personal tests;
+`edjenn1998/gnome-fluid-smoke`. The user authorized a public alpha prerelease;
+final stable release still requires laptop acceptance and measured performance.
 EGO additionally requires a maintainer able to explain/debug the JavaScript.

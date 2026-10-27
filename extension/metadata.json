@@ -1,7 +1,9 @@
 {
   "uuid": "fluid-smoke@edjenn1998.github.io",
-  "name": "Fluid Smoke — Architecture Probe",
-  "description": "Experimental native GPU architecture probe for Fluid Smoke. Temporary feedback trails, NOT a fluid solver. GNOME 51 Wayland validation required. Generated with AI for personal use; maintainer review required before EGO submission.",
+  "name": "Fluid Smoke",
+  "description": "Experimental interactive rainbow smoke wallpaper. GPU fluid flow, pressure projection and swirling dye on a black desktop. GNOME 51 Wayland. Alpha: on-device validation required. Generated with AI for personal use; maintainer review required before EGO submission.",
   "shell-version": ["51"],
+  "version": 3,
+  "version-name": "0.2.0-alpha.1",
   "url": "https://github.com/edjenn1998/gnome-fluid-smoke"
 }

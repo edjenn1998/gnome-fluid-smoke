@@ -1,12 +1,49 @@
 # Fluid Smoke architecture decision
 
-**Status: candidate Architecture A; Phase 2 validation gate OPEN.**
+**Status: Architecture A retained; first fluid alpha implemented.**
 
-This is an architecture probe, not a completed wallpaper or fluid simulation.
-No GNOME compositor execution has been performed here. Do not begin Phase 3
-until the laptop acceptance tests in `TESTING.md` pass. If float feedback,
-GJS paint-node dispatch, layering, or cleanup fails, resolve it or reconsider
-the backend before implementing a solver.
+The user reported working poc.2 visuals and requested the fluid implementation.
+The complete hardware checklist is still open. The new multi-texture renderer
+has offscreen shader validation but awaits GNOME 51 laptop testing.
+
+## Current fluid renderer — 0.2.0-alpha.1
+
+Eight RGBA16F targets per monitor: ping-pong velocity, dye and pressure, plus
+curl and divergence. At 384×216 this is approximately 5.1 MiB of texture storage
+per monitor, excluding driver/framebuffer overhead. Grids retain the 384-pixel
+long-edge cap. No textures/framebuffers are allocated in the per-frame loop.
+
+Per substep: advect/damp velocity and add buoyancy/pointer force; compute curl;
+apply vorticity confinement; compute divergence; clear pressure and perform 24
+Jacobi iterations; subtract pressure gradient; advect/inject RGB dye + density.
+That is 30 draws. Presentation converts density-weighted RGB to an opaque,
+black-backed smoke image. The old blue-channel probe sentinel is removed.
+
+Velocity units are grid cells/second. Sampling uses cell centers and clamped
+bilinear backtraces. Reflected normal velocity supplies divergence boundary
+samples; pressure uses clamped Neumann boundaries and projection zeros wall-normal
+velocity. This is a collocated, approximate stable-fluid solver: 24 iterations
+reduce rather than eliminate divergence. Semi-Lagrangian interpolation supplies
+numerical diffusion; a separate physical viscosity solve is not implemented.
+
+Wall time is capped at 1/15 second per update and split into at most two steps,
+each <=1/30 second. Pointer segments are partitioned between steps; impulse is
+derived from observed duration and capped at 120 cells/second. Advection/force
+velocity is capped at 180 cells/second before projection. Exponential velocity
+and dye decay are timestep-scaled. Ten seconds without motion clears all fields
+and suspends simulation. Existing lifecycle/session guards remain in use.
+
+Each draw binds explicit input layers and a distinct output. No runtime readback
+or GPU finish is used. `flush()` submits the final dye framebuffer. Dropping all
+JS owners on destroy still relies on GJS GC for native release. New tests cover
+the draw graph and partial allocation cleanup; `tools/validate_gpu.py` executes
+the actual shader bodies through EGL/GLES3 on RGBA16F targets. See `TESTING.md`.
+
+## Original architecture investigation and probe history
+
+The sections below record the original candidate selection and poc.1/poc.2
+investigation. Probe-only descriptions and original phase gates are historical;
+the current renderer/status are described above.
 
 ## Evidence and API availability
 
@@ -50,6 +87,53 @@ as the exact CachyOS GNOME 51.1 downstream build.
   and [get_pointer](https://gnome.pages.gitlab.gnome.org/mutter/meta/method.CursorTracker.get_pointer.html):
   queries the compositor seat. The returned coordinates are a Graphene point,
   not the old `[x,y,modifiers]` signature. The probe expects GJS `[point,mods]`.
+
+### poc.2 compatibility and lifecycle audit — 2026-10-27
+
+The laptop reported `TypeError: (intermediate value).is_wayland_compositor is
+not a function` with poc.1. Its exact source was `extension/shell/session.js:23`:
+`if (!Meta.is_wayland_compositor())`. This legacy namespace function is absent
+from GNOME 51. The probe now rejects a null result from
+`global.context.get_wayland_compositor()` before allocating resources:
+
+* [Shell.Global.get_context](https://gnome.pages.gitlab.gnome.org/gnome-shell/shell/method.Global.get_context.html)
+  exposes the Shell-owned `Meta.Context` as the `context` property.
+* [Meta.Context.get_wayland_compositor](https://gnome.pages.gitlab.gnome.org/mutter/meta/method.Context.get_wayland_compositor.html)
+  returns a borrowed `Meta.WaylandCompositor` or null. The extension only checks
+  this value; it must never destroy the Shell's context or compositor.
+
+Reviewed every extension module, the GNOME 51 port guide, and the following
+remaining external API groups. The GI documentation reviewed reports API/library
+version 51; live main-branch Shell source was checked for private JS integration.
+No further removed/nonexistent API was identified in this review.
+
+| Area | Reviewed APIs / findings |
+| --- | --- |
+| Pointer and monitors | `Meta.Backend.get_cursor_tracker()`, `CursorTracker.get_pointer()` with Graphene point + modifiers out parameters, `Display.get_monitor_in_fullscreen()`, `in-fullscreen-changed` |
+| Shell JS | `layoutManager.monitors`, `monitors-changed`, `_backgroundGroup`; `overview.visible`, `showing`/`hidden`; `screenShield.active`, `active-changed` remain in Shell source |
+| Reduced motion | `St.Settings.get()`, `reducedMotion`, `notify::reduced-motion`, `St.ReducedMotion.REDUCE` match the GNOME 51 port guide |
+| GPU context | `global.stage.context.get_backend().get_cogl_context()` matches the replacement for removed `Clutter.get_default_backend()` |
+| GPU targets | `Texture2D.new_with_format()`, `PixelFormat.RGBA_FP_16161616`, `Texture.allocate()`, `Offscreen.new_with_texture()`, framebuffer `allocate()`, `orthographic()`, `set_dither_enabled()`, `clear4f()`, `BufferBit.COLOR` remain documented |
+| Pipelines | `Pipeline.new()`, `Snippet.new()`/`set_replace()`, `SnippetHook.FRAGMENT`, `add_snippet()`, `set_blend()`, layer texture/filter/wrap setters and their enums, `get_uniform_location()`/`set_uniform_float()`, `draw_textured_rectangle()`, `flush()` remain documented |
+| Presentation | `GObject.registerClass()` implementing `Clutter.Content`, three-argument `paint_content` vfunc, `PipelineNode.new()`, paint-node `add_rectangle()`/`add_child()`, actor content box/paint opacity, `Content.invalidate()` |
+| Actor ownership | `Clutter.Actor` geometry/content/non-reactive/clip properties, `add_child()`, `child-added`, `set_child_above_sibling()`, `destroy()` |
+| Scheduling / entry point | Synchronous `Extension.enable()`/`disable()`, GObject signal connect/disconnect, GLib monotonic time, one-shot `timeout_add()`/`SOURCE_REMOVE`, `Source.remove()` |
+
+`set_uniform_float()` retains its explicit component/count arguments: the upstream
+header annotates `value` as `(array)`, not `(array length=count)`. Documentation
+alone does not establish successful GJS marshalling or shader execution.
+
+Initialization records each surface before allocating its GPU resources, so
+partial failures can release it. Rebuild rollback now also covers context lookup
+and the initial reset. Signal callbacks now use the same log-and-teardown policy
+as timer callbacks; a hotplug or suspension error must not leave polling/signals
+running. Startup errors still propagate to the Extensions UI after rollback.
+Repeated session destroy/extension disable is covered by isolated tests.
+
+Remaining live risks include the private background group, content vfunc dispatch,
+GI marshalling, float-target support, shader-driver behavior and GC-dependent GPU
+release. This audit is a source/documentation compatibility check, **not a passed
+GNOME Shell runtime test**. Rendering architecture and the Phase 3 gate are intact.
 
 ## Selection: native GPU, subject to on-device proof
 

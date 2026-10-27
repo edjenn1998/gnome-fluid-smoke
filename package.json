@@ -1,11 +1,13 @@
 {
   "name": "gnome-fluid-smoke",
-  "version": "0.1.0-poc.1",
+  "version": "0.2.0-alpha.1",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "test": "node --experimental-vm-modules --test tests/*.test.js",
-    "build": "python3 tools/package.py"
+    "build": "python3 tools/package.py",
+    "test:shaders": "node tools/validate_shaders.js",
+    "test:gpu": "python3 tools/validate_gpu.py"
   }
 }
