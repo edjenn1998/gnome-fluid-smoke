@@ -1,3 +1,8 @@
+
+
+https://github.com/user-attachments/assets/0c146518-fa6c-4e6b-994d-b53b2beba1fd
+
+<img width="1920" height="1080" alt="Screenshot From 2026-10-27 19-30-22" src="https://github.com/user-attachments/assets/7fcc9d2c-648c-4ac3-be42-26946d4da609" />
 # Fluid Smoke
 
 Interactive rainbow smoke wallpaper for **GNOME Shell 51 on Wayland**.
