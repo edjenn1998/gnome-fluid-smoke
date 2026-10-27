@@ -6,7 +6,7 @@ The user reported working poc.2 visuals and requested the fluid implementation.
 The complete hardware checklist is still open. The new multi-texture renderer
 has offscreen shader validation but awaits GNOME 51 laptop testing.
 
-## Implementation audit and current renderer — 0.2.0-alpha.3
+## Implementation audit and current renderer — 0.2.0-alpha.4
 
 The original probe was **not fluid dynamics**: two GPU passes translated and
 faded stored color and added a distance-to-pointer-segment splat. It had no
@@ -29,7 +29,7 @@ architecture, not a single ShaderEffect accumulating a picture. Offscreen GLES
 tests establish shader feasibility; Cogl/GI execution and GPU cost still require
 GNOME 51.1 testing. No source-level blocker justifies a separate renderer yet.
 
-Alpha.2/3 use nine persistent targets per monitor: two velocity, two pressure,
+Alpha.2–4 use nine persistent targets per monitor: two velocity, two pressure,
 curl and divergence at the flow resolution; two dye and one forward-transport
 scratch target at twice its width and height. The flow long edge remains <=384,
 dye <=768. A 384×216 flow grid uses ~11.4 MiB of texture storage, excluding driver
@@ -38,11 +38,12 @@ overhead. No per-frame texture/framebuffer allocation or CPU pixel loops occur.
 Per substep (32 GPU draws at default viscosity):
 
 1. Explicit viscous diffusion of velocity using a five-point Laplacian.
-2. Bilinear semi-Lagrangian velocity advection, exponential drag, density buoyancy
-   and additive mouse momentum along a continuous segment. Alpha.3 places broad
-   dye around a narrower momentum jet so the dye straddles the rolling shear.
-3. Finite-difference curl and vorticity confinement.
-4. Divergence, 24 Jacobi pressure iterations from zero, pressure-gradient removal.
+2. Midpoint semi-Lagrangian velocity advection, exponential drag, gentle density
+   buoyancy and relaxation toward twice the capped pointer velocity. A narrow dye
+   filament lies inside the wider momentum jet, which entrains it into rolls.
+3. Finite-difference curl and confinement using a smoothed, two-cell curl envelope.
+4. Divergence, 24 warm-started Jacobi pressure iterations, pressure-gradient removal.
+   Pressure is reset by `clear()` on idle/suspension/rebuild, not every substep.
 5. Forward dye advection followed by limited MacCormack error correction, decay
    and distance-scaled dye injection. Departure-cell extrema clamp corrected
    values to prevent overshoot/negative dye. Hardware LINEAR filtering applies
@@ -58,18 +59,19 @@ solved. Vorticity confinement restores small-scale spin lost to interpolation;
 Gaussian source shape, rainbow palette and optical density shading are visual
 models, not extra fluid equations. No procedural noise fakes motion.
 
-Alpha.3 presentation uses density-based color plus four nearby dye samples for a
-bounded soft halo. It preserves exact black for an empty field.
+Alpha.4 presentation uses density-based color, finite-difference density normals
+for fold lighting, and four nearby dye samples for a bounded soft halo. Density
+capping scales all channels together to preserve tint. Empty dye stays exact black.
 
-Developer tuning is in `core/simulation.js`: viscosity 0.4 cells²/s, velocity
-dissipation 0.25/s, dye dissipation 0.3/s and confinement 3. Constructor overrides
+Developer tuning is in `core/simulation.js`: viscosity 0.6 cells²/s, velocity
+dissipation 0.35/s, dye dissipation 0.45/s and confinement 6. Constructor overrides
 are range-validated; viscosity <=3 keeps nu*dt <=0.125, below the explicit 0.25
 stability limit. Zero viscosity skips its pass. There is no new preferences UI.
 
 Wall time is bounded to two <=1/24 s substeps (headroom for 30 Hz timer jitter).
 Pointer speed uses actual observed elapsed time, including idle polling, and is
-capped at 120 cells/s. Stationary samples inject nothing. Velocity is capped at
-180 cells/s before projection. After ten seconds without motion, already-decaying
+capped at 240 cells/s. Stationary samples inject nothing. Velocity is capped at
+360 cells/s before projection. After ten seconds without motion, already-decaying
 dye is cleared exactly and GPU work stops. A cheap 80 ms observer wakes it.
 
 The timer targets ~60 Hz, subtracting submission time from the next wait; 30

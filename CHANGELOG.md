@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0-alpha.4 — 2026-10-27 (rolling-plume test prerelease)
+
+* Addressed the updated screenshots' solid rainbow bands: inject a thinner dye
+  filament inside a wider, bounded momentum jet with stronger pointer coupling.
+* Warm-start the 24-iteration pressure solve to retain broad flow response between
+  frames; reset pressure with all other fields on idle, suspension and rebuild.
+* Use midpoint velocity backtracing and a smoothed curl envelope for confinement,
+  promoting larger rolls without amplifying single-cell edge noise.
+* Lower dye loading, preserve tint at the density cap, and light actual density
+  folds to reveal internal layers instead of flat, overbright stroke interiors.
+* Added slow/fast/circular production-solver previews; GPU numerical validation
+  now replays the production pass graph instead of maintaining a separate solver.
+* Numeric version 6. Offscreen visual/numerical checks pass; GNOME laptop visual
+  acceptance and performance measurements remain pending.
+
 ## 0.2.0-alpha.3 — 2026-10-27 (screenshot-guided test prerelease)
 
 * Compared supplied thin, jagged trails with the broad luminous reference plume.

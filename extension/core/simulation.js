@@ -9,10 +9,10 @@ export const MAX_SUBSTEPS = 2;
 // Developer tuning, not a preferences UI. Viscosity is cells²/second; decay
 // coefficients are per second. Explicit diffusion requires nu * dt <= 1/4.
 export const DEFAULT_PARAMETERS = Object.freeze({
-    viscosity: 0.4,
-    velocityDissipation: 0.25,
-    dyeDissipation: 0.3,
-    vorticity: 3,
+    viscosity: 0.6,
+    velocityDissipation: 0.35,
+    dyeDissipation: 0.45,
+    vorticity: 6,
 });
 
 export function simulationParameters(overrides = {}) {
@@ -40,7 +40,7 @@ export function planSteps(elapsed, segment, width, height) {
         (segment[3] - segment[1]) * height / elapsed,
     ] : [0, 0];
     const speed = Math.hypot(...impulse);
-    const scale = Math.min(1, 120 / Math.max(speed, 0.0001));
+    const scale = Math.min(1, 240 / Math.max(speed, 0.0001));
     const point = t => [segment[0] + (segment[2] - segment[0]) * t,
         segment[1] + (segment[3] - segment[1]) * t];
     return Array.from({length: count}, (_, i) => ({

@@ -44,17 +44,25 @@ class Recorder extends module.namespace.FluidSimulation {
             uniforms: {fs_dye_size: [this.dyeWidth, this.dyeHeight], ...uniforms}});
     }
 }
-const fluid = new Recorder(null, 320, 180);
+const fluid = new Recorder(null, Number(process.argv[3] ?? 320), Number(process.argv[4] ?? 180));
 fluid.initialize();
-// A sweep, reversal, then a pause: exposes leading rolls and post-input motion.
+// Exercise different pointer speeds and repeated stirring with the same solver.
+const scenario = process.argv[2] ?? 'sweep';
+if (!['sweep', 'slow', 'fast', 'circle'].includes(scenario))
+    throw new Error(`Unknown preview scenario: ${scenario}`);
 const point = frame => {
-    const t = frame / 90;
+    const t = frame / (scenario === 'fast' ? 30 : scenario === 'slow' ? 150 : 90);
+    if (scenario === 'circle')
+        return [0.5 + 0.2 * Math.cos(t * Math.PI * 2),
+            0.5 + 0.25 * Math.sin(t * Math.PI * 2)];
     return [0.75 - 0.5 * t, 0.5 + 0.16 * Math.sin(t * Math.PI * 2)];
 };
-for (let frame = 0; frame < 180; frame++) {
-    const segment = frame < 90 ? [...point(frame), ...point(frame + 1)] : null;
+const stop = scenario === 'fast' ? 30 : scenario === 'slow' ? 150 :
+    scenario === 'circle' ? 180 : 90;
+for (let frame = 0; frame < stop + 90; frame++) {
+    const segment = frame < stop ? [...point(frame), ...point(frame + 1)] : null;
     fluid.step(1 / 60, segment, frame / 60 * 1.8);
-    if ([59, 89, 119, 179].includes(frame))
+    if ([Math.floor(stop * 2 / 3) - 1, stop - 1, stop + 29, stop + 89].includes(frame))
         commands.push({snapshot: frame, dye: fluid.dye[0].id});
 }
 console.log(JSON.stringify({width: fluid.width, height: fluid.height, targets, commands}));

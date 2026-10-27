@@ -27,7 +27,7 @@ test('substeps cover a pointer path exactly once and cap injected speed', () => 
     assert.deepEqual(steps[0].segment.slice(0, 2), segment.slice(0, 2));
     assert.deepEqual(steps[0].segment.slice(2), steps[1].segment.slice(0, 2));
     steps[1].segment.slice(2).forEach((value, i) => assert.ok(Math.abs(value - segment[i + 2]) < 1e-12));
-    assert.ok(steps.every(step => Math.hypot(...step.impulse) <= 120.000001));
+    assert.ok(steps.every(step => Math.hypot(...step.impulse) <= 240.000001));
     const slow = planSteps(1, [0, 0, 0.01, 0.01], 100, 200);
     assert.deepEqual(slow[0].impulse, [1, 2]);
 });
@@ -88,7 +88,10 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     const fluid = new f.Simulation({}, 64, 36);
     fluid.initialize();
     assert.equal(f.targets.length, 9);
+    const pressureClears = f.targets.slice(5, 7).map(target => target.clears);
     fluid.step(1 / 15, [0.2, 0.3, 0.4, 0.5], 0.5);
+    assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears), pressureClears,
+        'pressure must survive between substeps for the warm-started solve');
     assert.equal(f.draws.length, 2 * (PRESSURE_ITERATIONS + 8));
     for (let i = 0; i < 2; i++) {
         const batch = f.draws.slice(i * 32, (i + 1) * 32);
@@ -104,6 +107,8 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     assert.equal(fluid.presentationPipeline(128).uniforms.fs_opacity[0], 128 / 255);
     fluid.clear();
     assert.ok(f.targets.every(target => target.clears >= 2));
+    assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears),
+        pressureClears.map(count => count + 1), 'reset must clear warm-started pressure');
     fluid.destroy();
     fluid.destroy();
     assert.equal(fluid.targets.length, 0);

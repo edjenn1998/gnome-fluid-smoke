@@ -5,16 +5,17 @@ Move the pointer to stir colored smoke across a black desktop, behind applicatio
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Status: 0.2.0-alpha.3 — visual test prerelease
+## Status: 0.2.0-alpha.4 — rolling-plume test prerelease
 
 The fluid-simulation builds replace the original upward-drifting
 trails with mouse-driven velocity, buoyancy, swirling vorticity, pressure
 projection and advected rainbow dye. Density-based shading gives the color a
 soft, translucent appearance against black. Alpha.2 adds higher-resolution dye,
 limited MacCormack transport, explicit viscosity and narrower momentum-driven
-injection. Alpha.3 responds to the supplied reference/screenshots with a broader
-dye source around an additive momentum jet, gentler buoyancy/confinement,
-longer-lived dye and a soft luminous halo. It is a test build, not a final release.
+injection. Alpha.4 addresses the solid ribbons in the latest screenshots: thin
+dye feeds a wider momentum jet, pressure persists between frames, and smoother
+confinement builds rolling curls. Lower dye loading and density-fold lighting
+reveal internal layers with a soft halo. It is a test build, not a final release.
 
 The user tested `0.1.0-poc.2` and reported working visuals that looked cool but
 did not resemble smoke. The new shaders passed offscreen software-rendered
@@ -40,7 +41,7 @@ quality selection and target-hardware performance measurements are future work.
 ## Download and install
 
 Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
-[alpha.3 visual test prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.3).
+[alpha.4 rolling-plume prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.4).
 The same build is available locally in `dist/` after running
 `python3 tools/package.py`. Older releases do **not** contain these visual changes.
 
@@ -64,7 +65,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `0.2.0-alpha.3` or numeric version `5`. GNOME 51 / Wayland is the
+Expect version `0.2.0-alpha.4` or numeric version `6`. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.

@@ -312,7 +312,21 @@ def validate(gpu):
     assert abs(end[1] - start[1]) < 0.1, (start, end)
     print(f"No-input dye packet centroid, +1s: {start} -> {end} (expected +24 dye cells)")
 
+    # Overlapping dense sources must retain tint when density hits its cap.
+    gpu.upload(velocity[0][0])
+    gpu.upload(dye[0][0], [4, 2, 1, 4] * (dw * dh))
+    transport(fs_emit=[1], fs_radius=[w * 10], fs_segment=[0.5, 0.5, 0.5, 0.5],
+              fs_color=[1, 0.5, 0.25], fs_amount=[3])
+    sample = gpu.read(dye[0])
+    assert max(sample[3::4]) <= 4
+    middle = 4 * ((dh // 2) * dw + dw // 2)
+    red, green, blue, density = sample[middle:middle + 4]
+    assert abs(red / density - 1) < 0.002
+    assert abs(green / density - 0.5) < 0.002
+    assert abs(blue / density - 0.25) < 0.002
+
     # Explicit viscosity must diffuse momentum while preserving uniform fields.
+    gpu.upload(velocity[0][0], [12, 0, 0, 1] * (w * h))
     gpu.draw("diffuseVelocity", velocity[1], [velocity[0]])
     assert abs(gpu.read(velocity[1])[4 * (w * (h // 2) + w // 2)] - 12) < 0.02
     impulse_field = [0.0] * (w * h * 4)
@@ -322,32 +336,28 @@ def validate(gpu):
     diffused = gpu.read(velocity[1])[0::4]
     assert 0 < max(diffused) < 12 and min(diffused) >= 0
 
-    for target in velocity + dye:
-        gpu.upload(target[0])
-    # Two seconds with circular pointer forcing followed by two seconds of free flow.
+    # Replay the production planner, sources and warm-started pass graph rather
+    # than maintaining a second solver whose tuning can drift from the extension.
+    recording = json.loads(subprocess.check_output([
+        'node', '--experimental-vm-modules', 'tools/preview_commands.js',
+        'circle', str(w), str(h)], cwd=ROOT))
+    targets = [gpu.target(width=tw, height=th) for tw, th in recording['targets']]
     snapshots = []
-    for frame in range(240):
-        angle = frame * 0.08
-        segment = [0.5 + 0.18 * math.cos(angle), 0.5 + 0.18 * math.sin(angle),
-                   0.5 + 0.18 * math.cos(angle + 0.08), 0.5 + 0.18 * math.sin(angle + 0.08)]
-        radius = max(4, min(w, h) * 0.055)
-        injection = dict(fs_segment=segment, fs_emit=[int(frame < 120)], fs_radius=[radius])
-        impulse = [(segment[2] - segment[0]) * w * 60, (segment[3] - segment[1]) * h * 60]
-        gpu.draw("diffuseVelocity", velocity[1], [velocity[0]])
-        velocity.reverse()
-        gpu.draw("advectVelocity", velocity[1], [velocity[0], dye[0]],
-                 **{**injection, 'fs_radius': [radius * 0.7]}, fs_impulse=impulse)
-        velocity.reverse()
-        gpu.draw("curl", curl, [velocity[0]])
-        gpu.draw("confine", velocity[1], [velocity[0], curl])
-        velocity.reverse()
-        project()
-        transport(**injection, fs_color=[1, 0.25, 0.6],
-                   fs_amount=[3 * min(1, math.hypot(*impulse) / 60 / radius)])
-        if frame in [119, 179, 239]:
-            snapshots.append(gpu.read(dye[0]))
-            speed = gpu.read(velocity[0])
-            assert max(abs(value) for value in speed) < 1000
+    for command in recording['commands']:
+        if 'clear' in command:
+            gpu.upload(targets[command['clear']][0])
+        elif 'snapshot' in command:
+            if command['snapshot'] >= 179:
+                snapshots.append(gpu.read(targets[command['dye']]))
+        else:
+            gpu.draw(command['name'], targets[command['output']],
+                     [targets[i] for i in command['inputs']], command['dt'],
+                     **command['uniforms'])
+    # Recorder target allocation order: velocity pair, dye pair, forward dye,
+    # pressure pair, curl and divergence. Check finite bounded persistent flow.
+    velocity = targets[:2]
+    dye = [targets[recording['commands'][-1]['dye']]]
+    assert max(abs(value) for value in gpu.read(velocity[0])) < 1000
     densities = [sum(snapshot[3::4]) for snapshot in snapshots]
     assert densities[0] > densities[1] > densities[2] > 0, densities
     assert rms([a - b for a, b in zip(snapshots[0], snapshots[1])]) > 0.005
@@ -361,7 +371,7 @@ def validate(gpu):
     gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
     displayed = gpu.read(scratch)
     assert all(value == 1 for value in displayed[3::4])
-    print(f"Smoke density totals after emission / +1s / +2s: {[round(v, 3) for v in densities]}")
+    print(f"Smoke density totals after emission / +0.5s / +1.5s: {[round(v, 3) for v in densities]}")
     print(f"After input stops: dye centroids {centers}; normalized shape change L1 {shape_change:.3f}")
     # Zero dye presents exact black, including opaque alpha.
     gpu.upload(dye[0][0])

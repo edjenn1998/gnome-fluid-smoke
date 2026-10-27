@@ -93,9 +93,10 @@ export class FluidSimulation {
         const steps = planSteps(elapsed, segment, this.width, this.height);
         const color = [0, 2.0944, 4.1888].map(phase => 0.55 + 0.45 * Math.cos(hue + phase));
         for (const {dt, segment: part, impulse} of steps) {
-            // A broad dye source straddles the narrower momentum jet, exposing
-            // its shear/rolling edges instead of drawing a one-cell cursor line.
-            const radius = Math.max(4, Math.min(this.width, this.height) * 0.055);
+            // Seed a thin filament INSIDE a wider momentum jet. Its leading
+            // vortex pair entrains the filament into rolls; painting dye across
+            // the whole shear layer instead makes a solid rainbow ribbon.
+            const radius = Math.max(3, Math.min(this.width, this.height) * 0.028);
             const injection = {
                 fs_segment: part ?? [0, 0, 0, 0],
                 fs_emit: [part ? 1 : 0],
@@ -107,7 +108,7 @@ export class FluidSimulation {
                 this.velocity.reverse();
             }
             this.draw('advectVelocity', this.velocity[1], [this.velocity[0], this.dye[0]], dt,
-                {...injection, fs_radius: [radius * 0.7], fs_impulse: impulse,
+                {...injection, fs_radius: [radius * 1.8], fs_impulse: impulse,
                     fs_velocity_decay: [this.parameters.velocityDissipation]});
             this.velocity.reverse();
             this.draw('curl', this.curl, [this.velocity[0]], dt);
@@ -115,9 +116,9 @@ export class FluidSimulation {
                 {fs_vorticity: [this.parameters.vorticity]});
             this.velocity.reverse();
             this.draw('divergence', this.divergence, [this.velocity[0]], dt);
-            // Start from zero: bounded work and no stale pressure after a pause.
-            for (const target of this.pressure)
-                target.framebuffer.clear4f(Cogl.BufferBit.COLOR, 0, 0, 0, 0);
+            // Warm-start the bounded solve. Repeatedly restarting at zero loses
+            // the broad pressure response that rolls a moving jet into a plume.
+            // clear() resets pressure along with velocity on every idle/rebuild.
             for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
                 this.draw('pressure', this.pressure[1], [this.pressure[0], this.divergence], dt);
                 this.pressure.reverse();
@@ -127,8 +128,9 @@ export class FluidSimulation {
             this.draw('advectDye', this.dyeForward, [this.velocity[0], this.dye[0]], dt);
             this.draw('correctDye', this.dye[1],
                 [this.velocity[0], this.dye[0], this.dyeForward], dt,
-                {...injection, fs_color: color, fs_dye_decay: [this.parameters.dyeDissipation],
-                    fs_amount: [3 * Math.min(1, Math.hypot(...impulse) * dt / radius)]});
+                {...injection, fs_radius: [radius * 0.85], fs_color: color,
+                    fs_dye_decay: [this.parameters.dyeDissipation],
+                    fs_amount: [1.2 * Math.min(1, Math.hypot(...impulse) * dt / radius)]});
             this.dye.reverse();
         }
         if (steps.length)

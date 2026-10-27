@@ -1,5 +1,46 @@
 # Validation record and acceptance checklist
 
+## 0.2.0-alpha.4 — 2026-10-27
+
+Compared the three updated desktop screenshots with the supplied reference.
+The new screenshots show filled rainbow ribbons and repetitive edge ripples;
+the reference shows nested rolls, narrow feeds and translucent internal folds.
+
+Changed the source width ratio, bounded pointer coupling, velocity backtrace,
+warm-started pressure, smoothed confinement, density loading and fold lighting.
+Reviewed 16 production-solver preview frames covering a sweep, slow stroke, fast
+stroke and repeated circular stirring, each including post-input evolution.
+The previews show large rolling heads, internal spirals and dark channels instead
+of the earlier filled bands. Repeated stirring still fills a large area; this is
+a 2D flow model, and reference equivalence is not established.
+
+All 18 JS tests and ten GLSL 1.20 checks pass. GPU checks use llvmpipe and RGBA16F:
+
+* One-second fade at 30/60 Hz: **0.631836 / 0.625977** (ideal 0.637628).
+* No-input dye transport: **23.843 dye cells** in one second (expected 24).
+* Production circular-stirring density at input stop / +0.5s / +1.5s:
+  **11060.175 / 9535.919 / 5791.704**.
+* Normalized density-shape change over the first no-input half-second: **1.194**.
+* Projection remains **0.600750 → 0.409050** divergence RMS for the isolated
+  cold-start test. This is not a divergence-free guarantee for production flow.
+* Density-cap tint preservation, finite flow, continuing transport and exact
+  opaque black for empty dye are checked. JS tests check warm-start preservation
+  and pressure reset with the other fields.
+
+The full-solver numerical check now replays production JS commands, avoiding a
+separate Python implementation with potentially stale source/pressure settings.
+Preview commands (use the optional EGL environment below when needed):
+
+```sh
+python3 tools/preview_gpu.py /tmp/opencode --scenario sweep
+python3 tools/preview_gpu.py /tmp/opencode --scenario slow
+python3 tools/preview_gpu.py /tmp/opencode --scenario fast
+python3 tools/preview_gpu.py /tmp/opencode --scenario circle
+```
+
+Files are named `smoke-<scenario>-<frame>.png`. No GNOME session is available here;
+Cogl integration, laptop appearance and target performance still need testing.
+
 ## 0.2.0-alpha.3 — 2026-10-27
 
 Compared the two supplied desktop screenshots (thin jagged colored paths) with
@@ -143,8 +184,8 @@ eslint --no-eslintrc --env es6 \
 
 ## Laptop acceptance checklist — new alpha remains untested
 
-Install using `README.md`, log out/in, enable and verify version **5** /
-`0.2.0-alpha.3`. Record Shell version, Wayland status, GPU/driver and display layout.
+Install using `README.md`, log out/in, enable and verify version **6** /
+`0.2.0-alpha.4`. Record Shell version, Wayland status, GPU/driver and display layout.
 Watch Shell logs while enabling/disabling.
 
 ### Appearance and simulation

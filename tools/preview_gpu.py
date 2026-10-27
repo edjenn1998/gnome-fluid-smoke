@@ -29,11 +29,12 @@ def png(path, width, height, pixels):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path, help='Existing output directory')
+    parser.add_argument('--scenario', choices=['sweep', 'slow', 'fast', 'circle'], default='sweep')
     args = parser.parse_args()
     if not args.output.is_dir():
         parser.error('output directory must exist')
     recording = json.loads(subprocess.check_output(
-        ['node', '--experimental-vm-modules', 'tools/preview_commands.js'], cwd=ROOT))
+        ['node', '--experimental-vm-modules', 'tools/preview_commands.js', args.scenario], cwd=ROOT))
     gpu = GPU(recording['width'], recording['height'])
     try:
         targets = [gpu.target(width=w, height=h) for w, h in recording['targets']]
@@ -45,7 +46,7 @@ def main():
             elif 'snapshot' in command:
                 gpu.draw('presentation', screen, [targets[command['dye']]],
                          fs_opacity=[1], fs_dye_size=[width, height])
-                path = args.output / f"smoke-{command['snapshot']:03d}.png"
+                path = args.output / f"smoke-{args.scenario}-{command['snapshot']:03d}.png"
                 png(path, width, height, gpu.read(screen))
                 print(path)
             else:
