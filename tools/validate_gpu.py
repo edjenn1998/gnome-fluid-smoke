@@ -27,7 +27,7 @@ def bind(library, name, result, *arguments):
 
 
 class GPU:
-    def __init__(self, width=96, height=64):
+    def __init__(self, width=96, height=64, root=ROOT):
         self.width, self.height = width, height
         self.egl = C.CDLL("libEGL.so.1")
         self.gl = C.CDLL("libGLESv2.so.2")
@@ -81,6 +81,9 @@ class GPU:
             "glReadPixels": (None, INT, INT, INT, INT, UINT, UINT, PTR),
             "glGetError": (UINT,),
             "glGetString": (C.c_char_p, UINT),
+            "glClearColor": (None, FLOAT, FLOAT, FLOAT, FLOAT),
+            "glClear": (None, UINT),
+            "glFinish": (None,),
         }
         for name, (result, *arguments) in signatures.items():
             self.functions[name] = bind(self.gl, name, result, *arguments)
@@ -88,12 +91,12 @@ class GPU:
         self.shaders = json.loads(subprocess.check_output([
             "node", "--input-type=module", "--eval",
             "import * as s from './extension/gpu/shaders.js'; console.log(JSON.stringify(s));",
-        ], cwd=ROOT))
+        ], cwd=root))
         self.programs = {name: self.program(shader) for name, shader in self.shaders.items()}
         self.parameters = json.loads(subprocess.check_output([
             "node", "--input-type=module", "--eval",
             "import {DEFAULT_PARAMETERS as p} from './extension/core/simulation.js'; console.log(JSON.stringify(p));",
-        ], cwd=ROOT))
+        ], cwd=root))
         self.call("glViewport", 0, 0, width, height)
 
     def call(self, name, *args):
@@ -202,6 +205,11 @@ class GPU:
         assert all(math.isfinite(value) for value in result), "Non-finite simulation state"
         return list(result)
 
+    def clear(self, target):
+        self.call("glBindFramebuffer", 0x8D40, target[1])
+        self.call("glClearColor", 0, 0, 0, 0)
+        self.call("glClear", 0x00004000)
+
     def close(self):
         bind(self.egl, "eglMakeCurrent", UINT, PTR, PTR, PTR, PTR)(self.display, None, None, None)
         bind(self.egl, "eglDestroyContext", UINT, PTR, PTR)(self.display, self.context)
@@ -271,8 +279,12 @@ def validate(gpu):
     assert residual80 < residual24
     print(f"Poisson residual RMS, 24 vs 80 iterations: {residual24:.6f} -> {residual80:.6f}")
     state = gpu.read(velocity[0])
-    assert all(state[4 * (y * w + x)] == 0 for y in range(h) for x in [0, w - 1])
-    assert all(state[4 * (y * w + x) + 1] == 0 for x in range(w) for y in [0, h - 1])
+    assert all(state[4 * (y * w + w - 1)] == 0 for y in range(h))
+    assert all(state[4 * ((h - 1) * w + x) + 1] == 0 for x in range(w))
+    # With compatible derivatives the pressure residual IS remaining divergence
+    # (allowing RGBA16F arithmetic error). This detects the old stencil mismatch.
+    gpu.draw('divergence', scratch, [velocity[0]])
+    assert abs(rms(gpu.read(scratch)[0::4]) - residual80) < 0.01
 
     # Uniform dye, no velocity/source: exponential fade should agree at 30/60 Hz.
     gpu.upload(velocity[0][0])
@@ -312,9 +324,9 @@ def validate(gpu):
     assert abs(end[1] - start[1]) < 0.1, (start, end)
     print(f"No-input dye packet centroid, +1s: {start} -> {end} (expected +24 dye cells)")
 
-    # Alpha.2 bounds each dye channel independently when dense sources overlap.
+    # Density limiting must preserve density-weighted tint at overlapping sources.
     gpu.upload(velocity[0][0])
-    gpu.upload(dye[0][0], [4, 2, 1, 4] * (dw * dh))
+    gpu.upload(dye[0][0], [8, 4, 2, 8] * (dw * dh))
     transport(fs_emit=[1], fs_radius=[w * 10], fs_segment=[0.5, 0.5, 0.5, 0.5],
               fs_color=[1, 0.5, 0.25], fs_amount=[3])
     sample = gpu.read(dye[0])
@@ -322,7 +334,8 @@ def validate(gpu):
     middle = 4 * ((dh // 2) * dw + dw // 2)
     red, green, blue, density = sample[middle:middle + 4]
     assert 0 <= blue <= green <= red <= 4
-    assert density == 4
+    assert abs(density - 4) < 0.005
+    assert abs(green / red - 0.5) < 0.01 and abs(blue / red - 0.25) < 0.01
 
     # Explicit viscosity must diffuse momentum while preserving uniform fields.
     gpu.upload(velocity[0][0], [12, 0, 0, 1] * (w * h))
@@ -344,7 +357,7 @@ def validate(gpu):
     snapshots = []
     for command in recording['commands']:
         if 'clear' in command:
-            gpu.upload(targets[command['clear']][0])
+            gpu.clear(targets[command['clear']])
         elif 'snapshot' in command:
             if command['snapshot'] >= 179:
                 snapshots.append(gpu.read(targets[command['dye']]))
@@ -358,25 +371,37 @@ def validate(gpu):
     dye = [targets[recording['commands'][-1]['dye']]]
     assert max(abs(value) for value in gpu.read(velocity[0])) < 1000
     densities = [sum(snapshot[3::4]) for snapshot in snapshots]
-    assert densities[0] > densities[1] > densities[2] > 0, densities
+    assert len(densities) == 4 and all(a > b > 0 for a,b in zip(densities, densities[1:])), densities
     assert rms([a - b for a, b in zip(snapshots[0], snapshots[1])]) > 0.005
     centers = [centroid(snapshot) for snapshot in snapshots]
     assert math.dist(centers[0], centers[1]) > 0.5, centers
     normalized = [[v / mass for v in snap[3::4]] for snap, mass in zip(snapshots, densities)]
     shape_change = sum(abs(a - b) for a, b in zip(normalized[0], normalized[1]))
     assert shape_change > 0.1, shape_change
+    for a, b in zip(normalized, normalized[1:]):
+        assert sum(abs(x-y) for x,y in zip(a,b)) > 0.1, 'post-input evolution stopped before +3s'
     gpu.draw("curl", curl, [velocity[0]])
     assert max(abs(value) for value in gpu.read(curl)[0::4]) > 0.01
     gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
     displayed = gpu.read(scratch)
     assert all(value == 1 for value in displayed[3::4])
-    print(f"Smoke density totals after emission / +0.5s / +1.5s: {[round(v, 3) for v in densities]}")
+    print(f"Smoke density totals after emission / +1s / +2s / +3s: {[round(v, 3) for v in densities]}")
     print(f"After input stops: dye centroids {centers}; normalized shape change L1 {shape_change:.3f}")
     # Zero dye presents exact black, including opaque alpha.
     gpu.upload(dye[0][0])
     gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
     assert all(v == 0 for i, v in enumerate(gpu.read(scratch)) if i % 4 != 3)
-    print("PASS: all ten shaders; projection, walls, viscosity, fade, post-input transport, curls, finite state, black")
+    # Same signed three-layer sentinel as the native developer view. This checks
+    # the diagnostic itself; native Cogl binding must still be checked on-device.
+    sentinels = [gpu.target([-.25, 0, 0, 0], 1, 1),
+                 gpu.target([0, -.25, 0, 0], 1, 1), gpu.target([0, 0, -.25, 0], 1, 1)]
+    gpu.draw('diagnostic', scratch, sentinels, fs_debug=[5], fs_opacity=[1])
+    result = gpu.read(scratch)
+    for i in range(3):
+        offset = 4 * ((h//2)*w + int(w*(i+.5)/3))
+        expected = [int(i == j) for j in range(3)] + [1]
+        assert result[offset:offset+4] == expected
+    print("PASS: all shaders; projection, walls, viscosity, fade, three-second post-input transport/deformation, curls, finite state, black")
 
 
 if __name__ == "__main__":

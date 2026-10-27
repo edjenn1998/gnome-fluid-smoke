@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0-alpha.6 — 2026-10-27 (fluid-quality test prerelease)
+
+* Kept the existing Cogl multipass solver and all session/integration features.
+* Matched backward divergence to forward pressure-gradient subtraction so their
+  composition equals Jacobi's five-point Laplacian, including closed-wall fluxes.
+* Retained 24 iterations with warm-starting; all fields still clear on reset.
+* Separated a modest dye filament from a 2.5× wider momentum envelope, retaining
+  pointer/simulation speed limits. Added midpoint velocity tracing, a two-cell
+  smoothed confinement envelope and reduced density-driven buoyancy.
+* Lowered dye injection, smoothly attenuated emission into already dense dye,
+  preserved tint at the safety density cap, and reduced optical extinction.
+  No halo, synthetic noise, doubled momentum or fold-lighting restoration.
+* Added a hidden GPU-only diagnostic view: velocity, signed curl, density,
+  pre/post divergence and signed three-layer sampler sentinel. Normal mode adds
+  no simulation passes or readback.
+* Controlled baseline/candidate previews cover straight sweep, slow/fast circles,
+  reversal, and 0/1/2/3 seconds after stopping. Added pressure-budget comparisons
+  and synchronized offscreen timings; extended deformation checks through +3s.
+* Numeric version 8. GitHub test prerelease; native GNOME equivalence, laptop
+  performance and visual acceptance await user testing. See FLUID_QUALITY.md.
+
 ## 0.2.0-alpha.5 — 2026-10-27 (alpha.2-based test prerelease)
 
 * Restored tagged alpha.2 shaders, source radius, pressure reset, flow parameters,

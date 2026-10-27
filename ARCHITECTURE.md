@@ -6,7 +6,7 @@ The user reported working poc.2 visuals and requested the fluid implementation.
 The complete hardware checklist is still open. The new multi-texture renderer
 has offscreen shader validation but awaits GNOME 51 laptop testing.
 
-## Implementation audit and current renderer — 0.2.0-alpha.5
+## Implementation audit and current renderer — 0.2.0-alpha.6
 
 The original probe was **not fluid dynamics**: two GPU passes translated and
 faded stored color and added a distance-to-pointer-segment splat. It had no
@@ -29,7 +29,7 @@ architecture, not a single ShaderEffect accumulating a picture. Offscreen GLES
 tests establish shader feasibility; Cogl/GI execution and GPU cost still require
 GNOME 51.1 testing. No source-level blocker justifies a separate renderer yet.
 
-Alpha.2–5 use nine persistent targets per monitor: two velocity, two pressure,
+Alpha.2–6 use nine normal-mode persistent targets per monitor: two velocity, two pressure,
 curl and divergence at the flow resolution; two dye and one forward-transport
 scratch target at twice its width and height. The flow long edge remains <=384,
 dye <=768. A 384×216 flow grid uses ~11.4 MiB of texture storage, excluding driver
@@ -38,32 +38,39 @@ overhead. No per-frame texture/framebuffer allocation or CPU pixel loops occur.
 Per substep (32 GPU draws at default viscosity):
 
 1. Explicit viscous diffusion of velocity using a five-point Laplacian.
-2. Alpha.2 semi-Lagrangian velocity advection, exponential drag, density buoyancy
-   and relaxation toward capped pointer velocity. Dye and momentum use the same
-   narrow Gaussian source radius.
-3. Finite-difference curl and confinement using a one-cell curl envelope.
-4. Divergence, 24 zero-started Jacobi pressure iterations, pressure-gradient removal.
-   Both pressure fields are cleared each substep, as in alpha.2.
+2. Midpoint semi-Lagrangian velocity advection, exponential drag, density buoyancy
+   and relaxation toward capped pointer velocity. A modest dye filament sits
+   inside a 2.5× wider momentum envelope.
+3. Finite-difference curl and confinement using a smoothed two-cell curl envelope.
+4. Backward divergence, 24 warm-started Jacobi iterations, forward pressure-gradient
+   removal. These compose to the same five-point Laplacian. Pressure clears with
+   all other fields on reset, not every substep.
 5. Forward dye advection followed by limited MacCormack error correction, decay
-   and distance-scaled dye injection. Departure-cell extrema clamp corrected
+   and distance-scaled, density-aware dye injection. Departure-cell extrema clamp corrected
    values to prevent overshoot/negative dye. Hardware LINEAR filtering applies
    throughout, including presentation upscaling.
 
 Velocity is in flow cells/second; high-resolution dye shares normalized UVs and
 uses flow dimensions for backtrace distance and dye dimensions for its limiter.
-Reflected wall-normal velocity, clamped pressure and zero wall-normal projected
-velocity implement approximate closed boundaries. The collocated pressure solve
-reduces, rather than eliminates, divergence. MacCormack is limited and not globally
+Projection treats stored components as outgoing cell fluxes, with implicit zero
+incoming left/top wall flux and explicit zero outgoing right/bottom wall flux.
+Clamped pressure gives consistent Neumann boundaries. Advection/curl still share
+one velocity texture: this is not a full staggered MAC-grid reconstruction.
+The bounded pressure solve reduces, rather than eliminates, divergence. MacCormack is limited and not globally
 mass-conservative; physical 3D smoke, combustion and sub-cell turbulence are not
 solved. Vorticity confinement restores small-scale spin lost to interpolation;
 Gaussian source shape, rainbow palette and optical density shading are visual
 models, not extra fluid equations. No procedural noise fakes motion.
 
-Alpha.5 restores alpha.2's density-based presentation with no fold lighting or
-halo. Each dye channel is capped at 4 independently. Empty dye stays exact black.
+Alpha.6 keeps density-based presentation with no fold lighting or halo. Extinction
+is 1.1 instead of 1.6; source loading attenuates with existing density. The density
+safety cap scales RGB and density together to preserve tint. Empty dye stays exact
+black. Developer-only diagnostics lazily add one flow-resolution scratch target,
+or three 1×1 signed layer sentinels, and release them with the simulation. Normal
+mode adds no draws/readback. See FLUID_QUALITY.md for native verification.
 
 Defaults in `core/simulation.js`: viscosity 0.15 cells²/s, velocity dissipation
-0.18/s, dye dissipation 0.65/s, confinement 8 and smoke emission 1.75× alpha.2.
+0.18/s, dye dissipation 0.65/s, confinement 8 and source-strength multiplier 1.75.
 Constructor overrides
 are range-validated; viscosity <=3 keeps nu*dt <=0.125, below the explicit 0.25
 stability limit. Zero viscosity skips its pass. `prefs.js` uses GTK4/libadwaita;

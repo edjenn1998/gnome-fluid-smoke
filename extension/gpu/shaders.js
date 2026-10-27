@@ -36,10 +36,11 @@ export const advectVelocity = {
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 v = velocity(uv);
-        vec2 back = bounded(uv - fs_dt * v / fs_size);
+        vec2 mid = bounded(uv - 0.5 * fs_dt * v / fs_size);
+        vec2 back = bounded(uv - fs_dt * velocity(mid) / fs_size);
         v = velocity(back) * exp(-fs_velocity_decay * fs_dt);
         float density = texture2D(cogl_sampler1, uv).a;
-        v.y -= min(density, 3.0) * 18.0 * fs_dt;
+        v.y -= min(density, 2.0) * 6.0 * fs_dt;
         v += (fs_impulse - v) * splat(uv) * (1.0 - exp(-30.0 * fs_dt));
         float speed = length(v);
         v *= min(1.0, 180.0 / max(speed, 0.0001));
@@ -78,14 +79,14 @@ export const confine = {
     declarations: grid + 'uniform float fs_vorticity;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
-        vec2 h = 1.0 / fs_size;
-        float l = abs(texture2D(cogl_sampler1, bounded(uv - vec2(h.x, 0.0))).r);
-        float r = abs(texture2D(cogl_sampler1, bounded(uv + vec2(h.x, 0.0))).r);
-        float t = abs(texture2D(cogl_sampler1, bounded(uv - vec2(0.0, h.y))).r);
-        float b = abs(texture2D(cogl_sampler1, bounded(uv + vec2(0.0, h.y))).r);
-        vec2 n = vec2(r - l, b - t);
+        vec2 h = 2.0 / fs_size;
+        float l = texture2D(cogl_sampler1, bounded(uv - vec2(h.x, 0.0))).r;
+        float r = texture2D(cogl_sampler1, bounded(uv + vec2(h.x, 0.0))).r;
+        float t = texture2D(cogl_sampler1, bounded(uv - vec2(0.0, h.y))).r;
+        float b = texture2D(cogl_sampler1, bounded(uv + vec2(0.0, h.y))).r;
+        vec2 n = vec2(abs(r) - abs(l), abs(b) - abs(t));
         n /= max(length(n), 0.0001);
-        float c = texture2D(cogl_sampler1, uv).r;
+        float c = (4.0 * texture2D(cogl_sampler1, uv).r + l + r + t + b) * 0.125;
         vec2 v = velocity(uv) + vec2(n.y, -n.x) * c * (fs_vorticity * fs_dt);
         v *= min(1.0, 180.0 / max(length(v), 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
@@ -97,10 +98,14 @@ export const divergence = {
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 h = 1.0 / fs_size;
-        float d = 0.5 * (velocity(uv + vec2(h.x, 0.0)).x
-            - velocity(uv - vec2(h.x, 0.0)).x
-            + velocity(uv + vec2(0.0, h.y)).y
-            - velocity(uv - vec2(0.0, h.y)).y);
+        // Backward divergence / forward pressure gradient compose to the exact
+        // five-point Laplacian solved by Jacobi. Centered/centered did not.
+        vec2 v = velocity(uv);
+        float l = uv.x < h.x ? 0.0 : velocity(uv - vec2(h.x, 0.0)).x;
+        float t = uv.y < h.y ? 0.0 : velocity(uv - vec2(0.0, h.y)).y;
+        if (uv.x > 1.0 - h.x) v.x = 0.0;
+        if (uv.y > 1.0 - h.y) v.y = 0.0;
+        float d = v.x - l + v.y - t;
         cogl_color_out = vec4(d, 0.0, 0.0, 1.0);
     `,
 };
@@ -124,13 +129,14 @@ export const project = {
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 h = 1.0 / fs_size;
-        float l = texture2D(cogl_sampler1, bounded(uv - vec2(h.x, 0.0))).r;
+        float p = texture2D(cogl_sampler1, uv).r;
         float r = texture2D(cogl_sampler1, bounded(uv + vec2(h.x, 0.0))).r;
-        float t = texture2D(cogl_sampler1, bounded(uv - vec2(0.0, h.y))).r;
         float b = texture2D(cogl_sampler1, bounded(uv + vec2(0.0, h.y))).r;
-        vec2 v = velocity(uv) - 0.5 * vec2(r - l, b - t);
-        if (uv.x <= h.x || uv.x >= 1.0 - h.x) v.x = 0.0;
-        if (uv.y <= h.y || uv.y >= 1.0 - h.y) v.y = 0.0;
+        vec2 v = velocity(uv) - vec2(r - p, b - p);
+        // Stored components are outgoing fluxes for projection; the incoming
+        // left/top wall fluxes are implicit zeros in divergence.
+        if (uv.x > 1.0 - h.x) v.x = 0.0;
+        if (uv.y > 1.0 - h.y) v.y = 0.0;
         cogl_color_out = vec4(v, 0.0, 1.0);
     `,
 };
@@ -170,10 +176,13 @@ export const correctDye = {
         vec4 d = texture2D(cogl_sampler1, base + h);
         dye = clamp(dye, min(min(a, b), min(c, d)), max(max(a, b), max(c, d)));
         dye *= exp(-fs_dye_decay * fs_dt);
-        float amount = splat(uv) * fs_amount;
+        // A moving source can catch its own advected dye and repeatedly load
+        // the jet head. Smoothly reduce new emission into already dense smoke;
+        // do not clamp away the structure/tint of smoke transported into a fold.
+        float amount = splat(uv) * fs_amount * exp(-dye.a / 0.6);
         dye += vec4(fs_color * amount, amount);
         // RGB is density-weighted, alpha is scalar smoke density (not opacity).
-        cogl_color_out = min(dye, vec4(4.0));
+        cogl_color_out = dye * min(1.0, 4.0 / max(dye.a, 0.0001));
     `,
 };
 
@@ -182,9 +191,44 @@ export const presentation = {
     body: `
         vec4 dye = texture2D(cogl_sampler0, cogl_tex_coord_in[0].xy);
         vec3 tint = dye.rgb / max(dye.a, 0.0001);
-        float opacity = 1.0 - exp(-1.6 * dye.a);
+        float opacity = 1.0 - exp(-1.1 * dye.a);
         // Do not amplify near-zero cell/interpolation errors with gamma < 1.
         vec3 color = max(tint * opacity, vec3(0.0));
+        cogl_color_out = vec4(color * fs_opacity, fs_opacity);
+    `,
+};
+
+// Developer-only display. No readback; modes are selected by a hidden schema key.
+export const diagnostic = {
+    declarations: 'uniform float fs_opacity; uniform float fs_debug;',
+    body: `
+        vec2 uv = cogl_tex_coord_in[0].xy;
+        vec3 color;
+        if (fs_debug > 4.5) {
+            vec4 v;
+            if (uv.x < 1.0/3.0) v = texture2D(cogl_sampler0, uv);
+            else if (uv.x < 2.0/3.0) v = texture2D(cogl_sampler1, uv);
+            else v = texture2D(cogl_sampler2, uv);
+            color = max(-4.0 * v.rgb, vec3(0.0));
+        } else if (fs_debug < 1.5) {
+            vec2 v = texture2D(cogl_sampler0, uv).xy;
+            color = vec3(max(v.x, 0.0), max(-v.x, 0.0), abs(v.y)) / 40.0;
+            color = color / (vec3(1.0) + color);
+        } else if (fs_debug < 2.5) {
+            float c = texture2D(cogl_sampler1, uv).r;
+            float a = 1.0 - exp(-abs(c) * 0.3);
+            color = c > 0.0 ? vec3(a, 0.15*a, 0.0) : vec3(0.0, 0.3*a, a);
+        } else if (fs_debug < 3.5) {
+            float d = texture2D(cogl_sampler0, uv).a;
+            color = vec3(1.0 - exp(-d));
+        } else {
+            // Same scale before (left) / after projection (right).
+            vec2 p = vec2(fract(uv.x * 2.0), uv.y);
+            float d = uv.x < 0.5 ? texture2D(cogl_sampler1, p).r
+                : texture2D(cogl_sampler2, p).r;
+            float a = 1.0 - exp(-abs(d));
+            color = d > 0.0 ? vec3(a, 0.0, 0.0) : vec3(0.0, a, a);
+        }
         cogl_color_out = vec4(color * fs_opacity, fs_opacity);
     `,
 };

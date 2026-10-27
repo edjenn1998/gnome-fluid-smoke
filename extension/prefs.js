@@ -28,7 +28,7 @@ export default class FluidSmokePreferences extends ExtensionPreferences {
             group.add(row);
         };
         spin(smoke, 'smoke-amount', 'Smoke amount',
-            '0.5–3× emission. 1× matches alpha.2; default is 1.75×.', 0.5, 3, 0.05, 2);
+            '0.5–3× source strength; default is 1.75×. Dense sources self-limit.', 0.5, 3, 0.05, 2);
         spin(smoke, 'linger-time', 'Linger time',
             'Seconds after movement stops. Longer also means a slower fade.', 4, 20, 1, 0);
 
@@ -72,7 +72,7 @@ export default class FluidSmokePreferences extends ExtensionPreferences {
         colorRow('secondary-color', 'Second color', value => value === 'gradient');
 
         const fluid = new Adw.PreferencesGroup({title: 'Fluid motion',
-            description: 'Small adjustments around the alpha.2 physics defaults.'});
+            description: 'Small adjustments to rolling flow and momentum smoothing.'});
         page.add(fluid);
         spin(fluid, 'swirl', 'Swirl', 'Gentler curls to livelier motion. Default: 8.', 4, 10, 0.5, 1);
         spin(fluid, 'viscosity', 'Viscosity',

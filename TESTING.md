@@ -1,5 +1,42 @@
 # Validation record and acceptance checklist
 
+## 0.2.0-alpha.6 — 2026-10-27
+
+See [FLUID_QUALITY.md](FLUID_QUALITY.md) for source findings, historical comparison,
+pressure/ablation measurements, preview observations, native diagnostics and the
+CachyOS GNOME 51.1 installation/acceptance procedure.
+
+* **22 JS tests pass**: normal pass graph/reset, isolated lazy diagnostics,
+  lifecycle rollback/cleanup, settings and continued post-input updates.
+* **11 GLSL 1.20 shader checks pass**, including the diagnostic shader.
+* Offscreen RGBA16F checks pass on **Radeon 8060S / radeonsi** and **llvmpipe**.
+  Hardware smooth-field cold projection: **.604336 → .408074**; Poisson residual
+  at 24/80 iterations **.408061 / .216874**. Residual agrees with actual remaining
+  divergence, detecting the previous operator mismatch. A cold 24 solve is still
+  intentionally incomplete; production warm-start measurements are in the report.
+* One-second fade at 30/60 Hz: **.516602 / .511719**. A no-input packet moves
+  **23.757** hardware / **23.843** software dye cells (expected 24). Full production
+  replay checks strictly decreasing density, continuing normalized deformation
+  through each of three post-input seconds, persistent curl, finite velocity,
+  tint preservation at the safety cap, signed three-layer sentinel and exact black.
+* At 96×64 flow, hardware production density at stop / +1s / +2s / +3s:
+  **669.543 / 389.058 / 222.010 / 119.007**; software:
+  **662.168 / 374.234 / 213.508 / 113.292**. Chaotic half-float evolution is not
+  expected to be pixel-identical across drivers. These numbers are not appearance
+  or native Cogl acceptance criteria.
+* Generated **76 snapshot PNGs plus 19 strips**: paired baseline/candidate input
+  scenarios, pressure budgets and individual-change ablations. Flow 320×180,
+  dye 640×360. Metrics use flow-cell-center stencils, plus a common flux-divergence
+  norm across versions. Synchronized replay timing excludes compilation/readback.
+* Strict schema compilation, preferences syntax, package metadata/allowlist and
+  both extension/comparison ZIP CRC checks pass. Package is alpha.6, numeric
+  version 8, with compiled GSettings schema. Published as a GitHub test prerelease.
+* No GNOME session is available here. Native Cogl execution, preferences UI,
+  target-device performance and the three-second visual acceptance test remain
+  **pending laptop testing**.
+
+The following sections preserve the historical validation records.
+
 ## 0.2.0-alpha.5 — 2026-10-27
 
 Returned to the tagged alpha.2 baseline; `extension/gpu/shaders.js` is identical

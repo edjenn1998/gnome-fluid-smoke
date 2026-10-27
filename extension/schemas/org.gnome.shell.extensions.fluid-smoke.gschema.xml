@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="org.gnome.shell.extensions.fluid-smoke" path="/org/gnome/shell/extensions/fluid-smoke/">
+    <key name="debug-view" type="s">
+      <choices><choice value="normal"/><choice value="velocity"/><choice value="curl"/><choice value="density"/><choice value="divergence"/><choice value="layers"/></choices>
+      <default>'normal'</default><summary>Temporary developer GPU view (not a visual preference)</summary>
+    </key>
     <key name="smoke-amount" type="d">
       <range min="0.5" max="3.0"/><default>1.75</default>
-      <summary>Smoke amount relative to alpha.2</summary>
+      <summary>Smoke source strength multiplier</summary>
     </key>
     <key name="linger-time" type="d">
       <range min="4.0" max="20.0"/><default>10.0</default>

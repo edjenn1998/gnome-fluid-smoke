@@ -6,7 +6,7 @@ export const PRESSURE_ITERATIONS = 24;
 export const MAX_STEP = 1 / 24;
 export const MAX_SUBSTEPS = 2;
 
-// Alpha.2 flow defaults. Viscosity is cells²/second; decay
+// Bounded flow defaults. Viscosity is cells²/second; decay
 // coefficients are per second. Explicit diffusion requires nu * dt <= 1/4.
 export const DEFAULT_PARAMETERS = Object.freeze({
     viscosity: 0.15,

@@ -5,16 +5,18 @@ Move the pointer to stir colored smoke across a black desktop, behind applicatio
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Status: 0.2.0-alpha.5 — alpha.2 baseline with more smoke and preferences
+## Status: 0.2.0-alpha.6 — fluid-quality correction test build
 
 The fluid-simulation builds replace the original upward-drifting
 trails with mouse-driven velocity, buoyancy, swirling vorticity, pressure
 projection and advected rainbow dye. Density-based shading gives the color a
 soft, translucent appearance against black. Alpha.2 adds higher-resolution dye,
 limited MacCormack transport, explicit viscosity and narrower momentum-driven
-injection. This build returns to the tagged alpha.2 motion, source width, pressure
-solve and shading, with 75% more smoke emission by default. Live preferences add
-smoke amount, colors, linger time and modest swirl/viscosity adjustments.
+injection. This build corrects incompatible pressure/projection stencils, keeps
+24 warm-started iterations, separates dye from the wider momentum envelope, and
+reduces dense source loading and optical saturation. Midpoint velocity tracing
+and smoothed confinement encourage larger rolling structures. Live preferences
+retain smoke amount, colors, linger time and modest swirl/viscosity adjustments.
 It is a test prerelease, not a final release.
 
 The user tested `0.1.0-poc.2` and reported working visuals that looked cool but
@@ -42,10 +44,11 @@ and target-hardware performance measurements are future work.
 ## Download and install
 
 Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
-[alpha.5 prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.5).
-The same build is available locally as
-`dist/fluid-smoke@edjenn1998.github.io.shell-extension.zip` after running
-`python3 tools/package.py`.
+[alpha.6 test prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.6).
+The release also includes `SHA256SUMS` and `fluid-smoke-alpha6-comparisons.zip`.
+The extension ZIP is available locally in `dist/` after `python3 tools/package.py`.
+See [FLUID_QUALITY.md](FLUID_QUALITY.md) for the investigation, controlled preview
+comparisons and native diagnostic instructions. Laptop visual acceptance remains pending.
 
 For an existing installation, first disable it:
 
@@ -67,7 +70,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `0.2.0-alpha.5` or numeric version `7`. GNOME 51 / Wayland is the
+Expect version `0.2.0-alpha.6` or numeric version `8`. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.
@@ -117,15 +120,15 @@ Changes apply immediately and persist across sessions:
 
 | Setting | Range / choices | Default |
 | --- | --- | --- |
-| Smoke amount | 0.5–3× alpha.2 emission | 1.75× |
+| Smoke amount | 0.5–3× source strength (dense sources self-limit) | 1.75× |
 | Color mode | Rainbow, single custom color, two-color blend | Rainbow |
 | Primary / second color | Color pickers; enabled for relevant modes | Blue / pink |
 | Linger time | 4–20 seconds; adjusts fade rate and idle clear together | 10 seconds |
 | Swirl | 4–10; gentle to livelier curls | 8 (alpha.2) |
 | Viscosity | 0.05–0.60; higher smooths flow more | 0.15 (alpha.2) |
 
-Reset to defaults restores every setting. Set smoke amount to 1× with the other
-settings at their defaults to reproduce alpha.2's emission and flow.
+Reset to defaults restores the visual preferences. Existing values survive an
+upgrade; source strength now uses the alpha.6 density-aware emission model.
 New colors affect newly emitted smoke; existing smoke fades naturally.
 Disable/re-enable to pause and clear.
 GNOME reduced motion stops animation. Fullscreen monitors suspend; lock and

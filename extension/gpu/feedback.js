@@ -31,6 +31,7 @@ export class FluidSimulation {
         this.height = height;
         this.parameters = simulationParameters(parameters);
         this.appearance = {};
+        this.debugView = 'normal';
         this.dyeWidth = width * 2;
         this.dyeHeight = height * 2;
         this.targets = [];
@@ -61,11 +62,10 @@ export class FluidSimulation {
         this.curl = this.target();
         this.divergence = this.target();
         for (const name of Object.keys(Shaders)) {
-            const layers = name === 'correctDye' ? 3 :
+            const layers = ['correctDye', 'diagnostic'].includes(name) ? 3 :
                 ['curl', 'divergence', 'diffuseVelocity', 'presentation'].includes(name) ? 1 : 2;
             this.pipelines[name] = makePipeline(this.context, Shaders[name], layers);
         }
-        this.context = null;
         this.clear();
     }
 
@@ -95,7 +95,8 @@ export class FluidSimulation {
         const steps = planSteps(elapsed, segment, this.width, this.height);
         const color = smokeColor(hue, this.appearance);
         for (const {dt, segment: part, impulse} of steps) {
-            const radius = Math.max(1.25, Math.min(this.width, this.height) * 0.009);
+            // Resolve a modest filament inside a wider momentum/shear envelope.
+            const radius = Math.max(1.5, Math.min(this.width, this.height) * 0.014);
             const injection = {
                 fs_segment: part ?? [0, 0, 0, 0],
                 fs_emit: [part ? 1 : 0],
@@ -107,7 +108,7 @@ export class FluidSimulation {
                 this.velocity.reverse();
             }
             this.draw('advectVelocity', this.velocity[1], [this.velocity[0], this.dye[0]], dt,
-                {...injection, fs_impulse: impulse,
+                {...injection, fs_radius: [radius * 2.5], fs_impulse: impulse,
                     fs_velocity_decay: [this.parameters.velocityDissipation]});
             this.velocity.reverse();
             this.draw('curl', this.curl, [this.velocity[0]], dt);
@@ -115,9 +116,8 @@ export class FluidSimulation {
                 {fs_vorticity: [this.parameters.vorticity]});
             this.velocity.reverse();
             this.draw('divergence', this.divergence, [this.velocity[0]], dt);
-            // Alpha.2 starts the bounded pressure solve from zero each substep.
-            for (const target of this.pressure)
-                target.framebuffer.clear4f(Cogl.BufferBit.COLOR, 0, 0, 0, 0);
+            // Keep the previous pressure as an initial guess. Lifecycle clear()
+            // still resets all fields, including pressure, on suspension/idle.
             for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
                 this.draw('pressure', this.pressure[1], [this.pressure[0], this.divergence], dt);
                 this.pressure.reverse();
@@ -128,17 +128,46 @@ export class FluidSimulation {
             this.draw('correctDye', this.dye[1],
                 [this.velocity[0], this.dye[0], this.dyeForward], dt,
                 {...injection, fs_color: color, fs_dye_decay: [this.parameters.dyeDissipation],
-                    fs_amount: [0.45 * this.parameters.smokeAmount *
+                    fs_amount: [0.28 * this.parameters.smokeAmount *
                         Math.min(1, Math.hypot(...impulse) * dt / radius)]});
             this.dye.reverse();
         }
         if (steps.length)
             this.dye[0].framebuffer.flush();
         this.pipelines.presentation.set_layer_texture(0, this.dye[0].texture);
+        if (this.debugView !== 'normal' && this.debugView !== 'layers') {
+            // Only diagnostic mode submits these additional passes. Pre-project
+            // divergence is already retained by the production pass graph.
+            this.debugDivergence ??= this.target();
+            this.draw('curl', this.curl, [this.velocity[0]], 0);
+            this.draw('divergence', this.debugDivergence, [this.velocity[0]], 0);
+        }
+        if (this.debugView !== 'normal') {
+            this.diagnostics = {frame: (this.diagnostics?.frame ?? 0) + 1,
+                elapsed, integrated: steps.reduce((sum, step) => sum + step.dt, 0),
+                substeps: steps.length, input: Boolean(segment),
+                width: this.width, height: this.height, pressureIterations: PRESSURE_ITERATIONS};
+        }
     }
 
     presentationPipeline(opacity) {
-        const pipeline = this.pipelines.presentation;
+        const mode = ['normal', 'velocity', 'curl', 'density', 'divergence', 'layers'].indexOf(this.debugView);
+        const pipeline = mode > 0 ? this.pipelines.diagnostic : this.pipelines.presentation;
+        if (mode > 0) {
+            pipeline.set_layer_texture(0, (mode === 3 ? this.dye[0] : this.velocity[0]).texture);
+            pipeline.set_layer_texture(1, (mode === 4 ? this.divergence : this.curl).texture);
+            pipeline.set_layer_texture(2, (this.debugDivergence ?? this.divergence).texture);
+            uniform(pipeline, 'fs_debug', [mode]);
+            if (mode === 5) {
+                this.debugLayers ??= [this.target(1, 1), this.target(1, 1), this.target(1, 1)];
+                this.debugLayers.forEach((target, i) => {
+                    const value = [0, 0, 0];
+                    value[i] = -0.25;
+                    target.framebuffer.clear4f(Cogl.BufferBit.COLOR, ...value, 0);
+                    pipeline.set_layer_texture(i, target.texture);
+                });
+            }
+        }
         uniform(pipeline, 'fs_opacity', [opacity / 255]);
         return pipeline;
     }
@@ -150,6 +179,9 @@ export class FluidSimulation {
         this.velocity = this.dye = this.pressure = null;
         this.curl = this.divergence = null;
         this.dyeForward = null;
+        this.debugDivergence = null;
+        this.debugLayers = null;
+        this.diagnostics = null;
         this.context = null;
     }
 }

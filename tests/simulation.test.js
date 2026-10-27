@@ -94,7 +94,7 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     const pressureClears = f.targets.slice(5, 7).map(target => target.clears);
     fluid.step(1 / 15, [0.2, 0.3, 0.4, 0.5], 0.5);
     assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears),
-        pressureClears.map(count => count + 2), 'alpha.2 clears pressure every substep');
+        pressureClears, 'warm-start retains pressure between substeps');
     assert.equal(f.draws.length, 2 * (PRESSURE_ITERATIONS + 8));
     for (let i = 0; i < 2; i++) {
         const batch = f.draws.slice(i * 32, (i + 1) * 32);
@@ -111,7 +111,7 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     fluid.clear();
     assert.ok(f.targets.every(target => target.clears >= 2));
     assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears),
-        pressureClears.map(count => count + 4), 'reset clears pressure as well as dye');
+        pressureClears.map(count => count + 1), 'reset clears pressure as well as dye');
     fluid.destroy();
     fluid.destroy();
     assert.equal(fluid.targets.length, 0);
@@ -125,7 +125,7 @@ test('viscosity is configurable within the explicit diffusion stability bound', 
     assert.throws(() => simulationParameters({dyeDissipation: NaN}), /invalid/);
 });
 
-test('smoke amount scales alpha.2 emission without changing motion or source width', async () => {
+test('smoke amount scales emission with a separate wider momentum envelope', async () => {
     const amounts = [];
     for (const smokeAmount of [1, 1.75, 3]) {
         const f = await fixture();
@@ -133,7 +133,8 @@ test('smoke amount scales alpha.2 emission without changing motion or source wid
         fluid.initialize();
         fluid.step(1 / 60, [0.2, 0.3, 0.4, 0.5], 0);
         amounts.push(f.draws.at(-1).uniforms.fs_amount[0]);
-        assert.equal(f.draws[1].uniforms.fs_radius[0], 1.25);
+        assert.equal(f.draws[1].uniforms.fs_radius[0], 3.75);
+        assert.equal(f.draws.at(-1).uniforms.fs_radius[0], 1.5);
         assert.equal(f.draws[1].uniforms.fs_velocity_decay[0], 0.18);
     }
     assert.equal(amounts[1], amounts[0] * 1.75);
@@ -148,4 +149,31 @@ test('partial GPU allocation can release every recorded native owner', async () 
     fluid.destroy();
     assert.equal(fluid.targets.length, 0);
     assert.equal(fluid.velocity, null);
+});
+
+test('diagnostics are isolated, project before measuring, and release lazily allocated targets', async () => {
+    const f = await fixture();
+    const fluid = new f.Simulation({}, 64, 36);
+    fluid.initialize();
+    fluid.debugView = 'divergence';
+    fluid.step(1 / 60, [0.2, 0.3, 0.4, 0.5], 0);
+    assert.equal(f.targets.length, 10);
+    assert.equal(f.draws.at(-1).shader, shaders.divergence.body);
+    const pipeline = fluid.presentationPipeline(255);
+    assert.equal(pipeline.uniforms.fs_debug[0], 4);
+    assert.notEqual(pipeline.textures[1], pipeline.textures[2]);
+    fluid.debugView = 'layers';
+    const layers = fluid.presentationPipeline(255);
+    assert.equal(layers.uniforms.fs_debug[0], 5);
+    assert.equal(new Set(layers.textures).size, 3);
+    assert.equal(f.targets.length, 13);
+    fluid.clear();
+    fluid.debugView = 'normal';
+    const count = f.draws.length;
+    fluid.step(1 / 60, null, 0);
+    assert.equal(f.draws.length - count, PRESSURE_ITERATIONS + 8);
+    assert.equal(fluid.presentationPipeline(255).shader, shaders.presentation.body);
+    fluid.destroy();
+    assert.equal(fluid.debugLayers, null);
+    assert.equal(fluid.debugDivergence, null);
 });

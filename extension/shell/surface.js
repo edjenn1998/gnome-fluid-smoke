@@ -47,9 +47,10 @@ export class MonitorSurface {
         parent.add_child(this.actor);
     }
 
-    configure({parameters, appearance, lingerTime}) {
+    configure({parameters, appearance, lingerTime, debugView = 'normal'}) {
         this.probe.parameters = simulationParameters(parameters);
         this.probe.appearance = appearance;
+        this.probe.debugView = debugView;
         this.lingerTime = lingerTime;
     }
 

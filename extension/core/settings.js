@@ -9,6 +9,7 @@ export function readSettings(settings) {
     const lingerTime = settings.get_double('linger-time');
     return {
         lingerTime,
+        debugView: settings.get_string('debug-view'),
         parameters: {
             smokeAmount: settings.get_double('smoke-amount'),
             dyeDissipation: 6.5 / lingerTime,
