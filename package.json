@@ -1,0 +1,11 @@
+{
+  "name": "gnome-fluid-smoke",
+  "version": "0.1.0-poc.1",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "test": "node --experimental-vm-modules --test tests/*.test.js",
+    "build": "python3 tools/package.py"
+  }
+}

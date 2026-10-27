@@ -1,0 +1,13 @@
+/dist/
+/build/
+/node_modules/
+__pycache__/
+*.pyc
+*.log
+*.zip
+.env
+.env.*
+!.env.example
+/.idea/
+/.vscode/
+*~

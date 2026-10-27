@@ -1,0 +1,7 @@
+{
+  "uuid": "fluid-smoke@edjenn1998.github.io",
+  "name": "Fluid Smoke — Architecture Probe",
+  "description": "Experimental native GPU architecture probe for Fluid Smoke. Temporary feedback trails, NOT a fluid solver. GNOME 51 Wayland validation required. Generated with AI for personal use; maintainer review required before EGO submission.",
+  "shell-version": ["51"],
+  "url": "https://github.com/edjenn1998/gnome-fluid-smoke"
+}
