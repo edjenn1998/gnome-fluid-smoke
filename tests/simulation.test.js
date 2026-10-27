@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import {planSteps, MAX_STEP, MAX_SUBSTEPS, PRESSURE_ITERATIONS,
     simulationParameters} from '../extension/core/simulation.js';
 import * as shaders from '../extension/gpu/shaders.js';
+import {smokeColor} from '../extension/core/settings.js';
 
 test('time planner bounds stalls and rejects invalid or nonpositive elapsed time', () => {
     for (const dt of [0, -1, Infinity, NaN])
@@ -27,7 +28,7 @@ test('substeps cover a pointer path exactly once and cap injected speed', () => 
     assert.deepEqual(steps[0].segment.slice(0, 2), segment.slice(0, 2));
     assert.deepEqual(steps[0].segment.slice(2), steps[1].segment.slice(0, 2));
     steps[1].segment.slice(2).forEach((value, i) => assert.ok(Math.abs(value - segment[i + 2]) < 1e-12));
-    assert.ok(steps.every(step => Math.hypot(...step.impulse) <= 240.000001));
+    assert.ok(steps.every(step => Math.hypot(...step.impulse) <= 120.000001));
     const slow = planSteps(1, [0, 0, 0.01, 0.01], 100, 200);
     assert.deepEqual(slow[0].impulse, [1, 2]);
 });
@@ -73,7 +74,9 @@ async function fixture({failAllocation = 0} = {}) {
         new URL('../extension/gpu/feedback.js', import.meta.url), 'utf8'), {context});
     await module.link(specifier => {
         const exports = specifier === 'gi://Cogl' ? {default: Cogl} :
-            specifier === './shaders.js' ? shaders : {planSteps, PRESSURE_ITERATIONS, simulationParameters};
+            specifier === './shaders.js' ? shaders :
+                specifier === '../core/settings.js' ? {smokeColor} :
+                    {planSteps, PRESSURE_ITERATIONS, simulationParameters};
         return new vm.SyntheticModule(Object.keys(exports), function () {
             for (const [key, value] of Object.entries(exports))
                 this.setExport(key, value);
@@ -90,8 +93,8 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     assert.equal(f.targets.length, 9);
     const pressureClears = f.targets.slice(5, 7).map(target => target.clears);
     fluid.step(1 / 15, [0.2, 0.3, 0.4, 0.5], 0.5);
-    assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears), pressureClears,
-        'pressure must survive between substeps for the warm-started solve');
+    assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears),
+        pressureClears.map(count => count + 2), 'alpha.2 clears pressure every substep');
     assert.equal(f.draws.length, 2 * (PRESSURE_ITERATIONS + 8));
     for (let i = 0; i < 2; i++) {
         const batch = f.draws.slice(i * 32, (i + 1) * 32);
@@ -108,7 +111,7 @@ test('solver pass graph avoids feedback, projects before dye, and clears all fie
     fluid.clear();
     assert.ok(f.targets.every(target => target.clears >= 2));
     assert.deepEqual(f.targets.slice(5, 7).map(target => target.clears),
-        pressureClears.map(count => count + 1), 'reset must clear warm-started pressure');
+        pressureClears.map(count => count + 4), 'reset clears pressure as well as dye');
     fluid.destroy();
     fluid.destroy();
     assert.equal(fluid.targets.length, 0);
@@ -120,6 +123,21 @@ test('viscosity is configurable within the explicit diffusion stability bound', 
     assert.equal(simulationParameters({viscosity: 0}).viscosity, 0);
     assert.ok(simulationParameters({viscosity: 100}).viscosity * MAX_STEP <= 0.25);
     assert.throws(() => simulationParameters({dyeDissipation: NaN}), /invalid/);
+});
+
+test('smoke amount scales alpha.2 emission without changing motion or source width', async () => {
+    const amounts = [];
+    for (const smokeAmount of [1, 1.75, 3]) {
+        const f = await fixture();
+        const fluid = new f.Simulation({}, 64, 36, {smokeAmount});
+        fluid.initialize();
+        fluid.step(1 / 60, [0.2, 0.3, 0.4, 0.5], 0);
+        amounts.push(f.draws.at(-1).uniforms.fs_amount[0]);
+        assert.equal(f.draws[1].uniforms.fs_radius[0], 1.25);
+        assert.equal(f.draws[1].uniforms.fs_velocity_decay[0], 0.18);
+    }
+    assert.equal(amounts[1], amounts[0] * 1.75);
+    assert.equal(amounts[2], amounts[0] * 3);
 });
 
 test('partial GPU allocation can release every recorded native owner', async () => {

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0-alpha.5 — 2026-10-27 (alpha.2-based test prerelease)
+
+* Restored tagged alpha.2 shaders, source radius, pressure reset, flow parameters,
+  pointer speed limit and color-cycle speed.
+* Increased smoke emission to 1.75× alpha.2 by default without widening the source.
+* Added GNOME preferences with live, persistent smoke amount, rainbow/single-color/
+  two-color modes, color pickers, 4–20 second lingering, and bounded swirl/viscosity.
+* Linger time controls fade speed and idle clear together. Defaults restore alpha.2
+  physics; smoke amount 1× reproduces its emission. Added reset-to-defaults.
+* Packaged schema XML and compiled GSettings data, with strict build validation.
+* All 21 isolated JS tests, ten GLSL checks and offscreen GPU checks pass. GNOME
+  preferences UI, desktop visuals and laptop performance await on-device testing.
+* Numeric version 7. Packaged as a GitHub test prerelease.
+
 ## 0.2.0-alpha.4 — 2026-10-27 (rolling-plume test prerelease)
 
 * Addressed the updated screenshots' solid rainbow bands: inject a thinner dye

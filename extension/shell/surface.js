@@ -7,6 +7,7 @@ import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import {FluidSimulation} from '../gpu/feedback.js';
 import {probeDimensions} from '../core/coordinates.js';
+import {simulationParameters} from '../core/simulation.js';
 
 const ProbeContent = GObject.registerClass({
     Implements: [Clutter.Content],
@@ -24,6 +25,7 @@ export class MonitorSurface {
         this.lastMotion = 0;
         this.lastFrame = 0;
         this.active = false;
+        this.lingerTime = 10;
         const [width, height] = probeDimensions(monitor);
         this.probe = new FluidSimulation(context, width, height);
     }
@@ -45,6 +47,12 @@ export class MonitorSurface {
         parent.add_child(this.actor);
     }
 
+    configure({parameters, appearance, lingerTime}) {
+        this.probe.parameters = simulationParameters(parameters);
+        this.probe.appearance = appearance;
+        this.lingerTime = lingerTime;
+    }
+
     update(now, segment, suspended) {
         if (suspended) {
             if (this.active)
@@ -61,11 +69,11 @@ export class MonitorSurface {
         }
         if (!this.active)
             return;
-        if (now - this.lastMotion >= 10) {
+        if (now - this.lastMotion >= this.lingerTime) {
             this.reset();
             return;
         }
-        this.probe.step(dt, segment, now * 1.8);
+        this.probe.step(dt, segment, now * 0.7);
         this.content.invalidate();
     }
 

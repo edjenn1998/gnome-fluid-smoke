@@ -36,17 +36,13 @@ export const advectVelocity = {
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 v = velocity(uv);
-        vec2 mid = bounded(uv - 0.5 * fs_dt * v / fs_size);
-        vec2 back = bounded(uv - fs_dt * velocity(mid) / fs_size);
+        vec2 back = bounded(uv - fs_dt * v / fs_size);
         v = velocity(back) * exp(-fs_velocity_decay * fs_dt);
         float density = texture2D(cogl_sampler1, uv).a;
-        // Pointer momentum drives the plume; gentle buoyancy only lifts old dye.
-        v.y -= min(density, 1.0) * 1.5 * fs_dt;
-        // Relax toward pointer momentum instead of accumulating an unbounded
-        // jet on slow/repeated strokes. The wider jet entrains surrounding dye.
-        v += (2.0 * fs_impulse - v) * splat(uv) * (1.0 - exp(-36.0 * fs_dt));
+        v.y -= min(density, 3.0) * 18.0 * fs_dt;
+        v += (fs_impulse - v) * splat(uv) * (1.0 - exp(-30.0 * fs_dt));
         float speed = length(v);
-        v *= min(1.0, 360.0 / max(speed, 0.0001));
+        v *= min(1.0, 180.0 / max(speed, 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
     `,
 };
@@ -82,22 +78,16 @@ export const confine = {
     declarations: grid + 'uniform float fs_vorticity;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
-        // Measure the curl envelope across several cells, rather than feeding
-        // single-cell half-float noise back into regular comb-like edge teeth.
-        vec2 h = 2.0 / fs_size;
+        vec2 h = 1.0 / fs_size;
         float l = abs(texture2D(cogl_sampler1, bounded(uv - vec2(h.x, 0.0))).r);
         float r = abs(texture2D(cogl_sampler1, bounded(uv + vec2(h.x, 0.0))).r);
         float t = abs(texture2D(cogl_sampler1, bounded(uv - vec2(0.0, h.y))).r);
         float b = abs(texture2D(cogl_sampler1, bounded(uv + vec2(0.0, h.y))).r);
         vec2 n = vec2(r - l, b - t);
         n /= max(length(n), 0.0001);
-        float c = (texture2D(cogl_sampler1, uv).r * 4.0
-            + texture2D(cogl_sampler1, bounded(uv - vec2(h.x, 0.0))).r
-            + texture2D(cogl_sampler1, bounded(uv + vec2(h.x, 0.0))).r
-            + texture2D(cogl_sampler1, bounded(uv - vec2(0.0, h.y))).r
-            + texture2D(cogl_sampler1, bounded(uv + vec2(0.0, h.y))).r) * 0.125;
+        float c = texture2D(cogl_sampler1, uv).r;
         vec2 v = velocity(uv) + vec2(n.y, -n.x) * c * (fs_vorticity * fs_dt);
-        v *= min(1.0, 360.0 / max(length(v), 0.0001));
+        v *= min(1.0, 180.0 / max(length(v), 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
     `,
 };
@@ -183,40 +173,18 @@ export const correctDye = {
         float amount = splat(uv) * fs_amount;
         dye += vec4(fs_color * amount, amount);
         // RGB is density-weighted, alpha is scalar smoke density (not opacity).
-        // Bound density without independently clipping RGB (which destroys
-        // tint and flattens the structure of overlapping strokes).
-        cogl_color_out = dye * min(1.0, 4.0 / max(dye.a, 0.0001));
+        cogl_color_out = min(dye, vec4(4.0));
     `,
 };
 
 export const presentation = {
-    declarations: 'uniform float fs_opacity; uniform vec2 fs_dye_size;',
+    declarations: 'uniform float fs_opacity;',
     body: `
-        vec2 uv = cogl_tex_coord_in[0].xy;
-        vec4 dye = texture2D(cogl_sampler0, uv);
+        vec4 dye = texture2D(cogl_sampler0, cogl_tex_coord_in[0].xy);
         vec3 tint = dye.rgb / max(dye.a, 0.0001);
-        float opacity = 1.0 - exp(-1.4 * dye.a);
+        float opacity = 1.0 - exp(-1.6 * dye.a);
         // Do not amplify near-zero cell/interpolation errors with gamma < 1.
         vec3 color = max(tint * opacity, vec3(0.0));
-        // Light the advected density folds, not the cursor or a synthetic noise
-        // pattern. Thin ridges catch light while broad interiors stay translucent.
-        vec2 texel = 1.5 / fs_dye_size;
-        float dx = texture2D(cogl_sampler0, uv + vec2(texel.x, 0.0)).a
-            - texture2D(cogl_sampler0, uv - vec2(texel.x, 0.0)).a;
-        float dy = texture2D(cogl_sampler0, uv + vec2(0.0, texel.y)).a
-            - texture2D(cogl_sampler0, uv - vec2(0.0, texel.y)).a;
-        vec3 normal = normalize(vec3(-dx, -dy, 0.18));
-        float light = max(dot(normal, normalize(vec3(-0.4, -0.6, 0.7))), 0.0);
-        color *= 0.55 + 0.45 * light;
-        color += vec3(0.22 * pow(light, 16.0) * opacity);
-        // A small, bounded halo gives luminous folds without lifting the black
-        // background. Its radius tracks dye resolution, not monitor pixels.
-        vec2 h = 6.0 / fs_dye_size;
-        vec3 halo = (texture2D(cogl_sampler0, uv + vec2(h.x, 0.0)).rgb
-            + texture2D(cogl_sampler0, uv - vec2(h.x, 0.0)).rgb
-            + texture2D(cogl_sampler0, uv + vec2(0.0, h.y)).rgb
-            + texture2D(cogl_sampler0, uv - vec2(0.0, h.y)).rgb) * 0.25;
-        color += 0.12 * (vec3(1.0) - exp(-halo));
         cogl_color_out = vec4(color * fs_opacity, fs_opacity);
     `,
 };

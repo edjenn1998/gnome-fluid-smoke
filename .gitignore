@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 *.log
 *.zip
+gschemas.compiled
 .env
 .env.*
 !.env.example

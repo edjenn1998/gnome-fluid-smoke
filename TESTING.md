@@ -1,5 +1,25 @@
 # Validation record and acceptance checklist
 
+## 0.2.0-alpha.5 — 2026-10-27
+
+Returned to the tagged alpha.2 baseline; `extension/gpu/shaders.js` is identical
+to that tag. Added 1.75× default emission and live GSettings preferences.
+
+* All **21 JS tests pass**, including emission scaling, custom colors, live settings,
+  hotplug persistence, signal cleanup and extended linger-time behavior.
+* All **ten GLSL 1.20 checks pass**, using the optional validator below.
+* Offscreen llvmpipe RGBA16F checks pass using the optional EGL environment below.
+  Projection RMS: **0.600750 → 0.409050**. One-second fade at 30/60 Hz:
+  **0.516602 / 0.511719**. No-input dye packet moves **23.843** dye cells.
+  Production density at stop / +0.5s / +1.5s: **2425.809 / 1959.009 / 1138.720**.
+  Normalized shape change: **1.011**. Exact-black idle presentation passes.
+* Strict schema validation, preferences JS syntax, package creation and ZIP CRC pass.
+* No GNOME/GJS session is available here. Check the actual preferences window,
+  color dialogs, live edits, saved values after logout/login, reset button, desktop
+  appearance and target-device performance on GNOME 51 Wayland.
+
+The sections below describe older builds and are historical validation records.
+
 ## 0.2.0-alpha.4 — 2026-10-27
 
 Compared the three updated desktop screenshots with the supplied reference.

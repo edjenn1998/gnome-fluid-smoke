@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
 import {probeDimensions} from '../extension/core/coordinates.js';
+import {simulationParameters} from '../extension/core/simulation.js';
 
 test('surface keeps stepping without input, then clears and stops at ten seconds', async () => {
     const steps = [];
@@ -22,6 +23,7 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
         'gi://GObject': {default: {Object: Content, registerClass: (_props, cls) => cls}},
         '../gpu/feedback.js': {FluidSimulation: Simulation},
         '../core/coordinates.js': {probeDimensions},
+        '../core/simulation.js': {simulationParameters},
     };
     const module = new vm.SourceTextModule(await readFile(new URL(
         '../extension/shell/surface.js', import.meta.url), 'utf8'), {context});
@@ -48,5 +50,12 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
     assert.equal(surface.active, false);
     surface.update(12, null, false);
     assert.equal(steps.length, 5);
+    surface.configure({parameters: {}, appearance: {mode: 'solid'}, lingerTime: 20});
+    surface.update(13, [0.3, 0.3, 0.4, 0.3], false);
+    surface.update(24, null, false);
+    assert.equal(surface.active, true, 'longer linger must not clear at ten seconds');
+    surface.update(33, null, false);
+    assert.equal(surface.active, false);
+    assert.equal(clears, 2);
     surface.destroy();
 });

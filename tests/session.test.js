@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {readSettings} from '../extension/core/settings.js';
 
 class Emitter {
     handlers = new Map();
@@ -27,6 +28,11 @@ async function fixture({wayland = true} = {}) {
     let point = {x: 100, y: 100};
     let time = 1;
     const errors = [];
+    const values = {'smoke-amount': 1.75, 'linger-time': 10, swirl: 8, viscosity: 0.15,
+        'color-mode': 'rainbow', 'primary-color': '#66ccff', 'secondary-color': '#ff66cc'};
+    const preferences = Object.assign(new Emitter(), {
+        get_double: key => values[key], get_string: key => values[key],
+    });
     class Actor {
         constructor(props) { Object.assign(this, props); actors.push(this); }
         destroy() { this.destroyed = true; }
@@ -55,6 +61,7 @@ async function fixture({wayland = true} = {}) {
                 throw new Error('mock monitor allocation failure');
         }
         reset() { this.active = false; }
+        configure(options) { this.options = options; }
         update(_now, segment, suspended) { this.active = !!segment && !suspended; }
         destroy() { this.destroyed = true; }
     }
@@ -73,6 +80,7 @@ async function fixture({wayland = true} = {}) {
         'gi://St': {default: {Settings: {get: () => settings}, ReducedMotion: {REDUCE: 1}}},
         'resource:///org/gnome/shell/ui/main.js': {layoutManager: layout, screenShield: shield, overview},
         './surface.js': {MonitorSurface: Surface},
+        '../core/settings.js': {readSettings},
     };
     const source = await readFile(new URL('../extension/shell/session.js', import.meta.url), 'utf8');
     const module = new vm.SourceTextModule(source, {context});
@@ -96,14 +104,14 @@ async function fixture({wayland = true} = {}) {
             return module;
         assert.equal(specifier, 'resource:///org/gnome/shell/extensions/extension.js');
         return new vm.SyntheticModule(['Extension'], function () {
-            this.setExport('Extension', class {});
+            this.setExport('Extension', class { getSettings() { return preferences; } });
         }, {context});
     });
     await entry.evaluate();
     return {
         Session: module.namespace.ProbeSession, timers, surfaces, layout, shield, settings, display, overview,
-        Extension: entry.namespace.default, shellGlobal, errors, actors,
-        emitters: [background, layout, shield, settings, display, overview],
+        Extension: entry.namespace.default, shellGlobal, errors, actors, preferences, values,
+        emitters: [background, layout, shield, settings, display, overview, preferences],
         move(x, y) { point = {x, y}; time += 0.017; },
         advance(seconds) { time += seconds; },
         fire() {
@@ -239,4 +247,25 @@ test('pointer polling failure stops the timer and tears down the session', async
     assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
     assert.ok(f.surfaces.every(surface => surface.destroyed));
     session.destroy();
+});
+
+test('preferences apply live, survive monitor rebuilds and disconnect on disable', async () => {
+    const f = await fixture();
+    const extension = new f.Extension();
+    extension.enable();
+    const first = f.surfaces[0];
+    assert.equal(first.options.parameters.smokeAmount, 1.75);
+    f.values['linger-time'] = 20;
+    f.values['smoke-amount'] = 3;
+    f.values['color-mode'] = 'solid';
+    f.preferences.emit('changed');
+    assert.equal(first.options.lingerTime, 20);
+    assert.equal(first.options.parameters.dyeDissipation, 0.325);
+    assert.equal(first.options.parameters.smokeAmount, 3);
+    assert.equal(first.options.appearance.mode, 'solid');
+    assert.equal(first.destroyed, undefined, 'live changes reuse GPU surfaces');
+    f.layout.emit('monitors-changed');
+    assert.equal(f.surfaces.at(-1).options.parameters.smokeAmount, 3);
+    extension.disable();
+    assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
 });

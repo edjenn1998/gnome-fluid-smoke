@@ -5,17 +5,17 @@ Move the pointer to stir colored smoke across a black desktop, behind applicatio
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Status: 0.2.0-alpha.4 — rolling-plume test prerelease
+## Status: 0.2.0-alpha.5 — alpha.2 baseline with more smoke and preferences
 
 The fluid-simulation builds replace the original upward-drifting
 trails with mouse-driven velocity, buoyancy, swirling vorticity, pressure
 projection and advected rainbow dye. Density-based shading gives the color a
 soft, translucent appearance against black. Alpha.2 adds higher-resolution dye,
 limited MacCormack transport, explicit viscosity and narrower momentum-driven
-injection. Alpha.4 addresses the solid ribbons in the latest screenshots: thin
-dye feeds a wider momentum jet, pressure persists between frames, and smoother
-confinement builds rolling curls. Lower dye loading and density-fold lighting
-reveal internal layers with a soft halo. It is a test build, not a final release.
+injection. This build returns to the tagged alpha.2 motion, source width, pressure
+solve and shading, with 75% more smoke emission by default. Live preferences add
+smoke amount, colors, linger time and modest swirl/viscosity adjustments.
+It is a test prerelease, not a final release.
 
 The user tested `0.1.0-poc.2` and reported working visuals that looked cool but
 did not resemble smoke. The new shaders passed offscreen software-rendered
@@ -29,21 +29,23 @@ performance still need GNOME laptop testing.** See [TESTING.md](TESTING.md).
   buoyancy and vorticity confinement.
 - Divergence calculation, 24 Jacobi pressure iterations and velocity projection.
 - Smooth pointer-segment injection with capped momentum and changing RGB color.
-- Black background, ten-second idle clear and simulation suspension.
+- Live preferences for amount, colors, lingering and fluid motion.
+- Black background, configurable idle clear (ten seconds by default) and simulation suspension.
 - Pointer observation over applications without capturing input.
 - Monitor rebuild, fullscreen, lock, Overview and reduced-motion suspension.
 - Lifecycle cleanup and rollback on initialization/runtime errors.
 
 The pressure solve is a bounded approximation, not an exact incompressibility
-guarantee. Grids are capped at 384 pixels on the longest edge. Preferences,
-quality selection and target-hardware performance measurements are future work.
+guarantee. Grids are capped at 384 pixels on the longest edge. Quality selection
+and target-hardware performance measurements are future work.
 
 ## Download and install
 
 Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
-[alpha.4 rolling-plume prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.4).
-The same build is available locally in `dist/` after running
-`python3 tools/package.py`. Older releases do **not** contain these visual changes.
+[alpha.5 prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.5).
+The same build is available locally as
+`dist/fluid-smoke@edjenn1998.github.io.shell-extension.zip` after running
+`python3 tools/package.py`.
 
 For an existing installation, first disable it:
 
@@ -65,7 +67,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `0.2.0-alpha.4` or numeric version `6`. GNOME 51 / Wayland is the
+Expect version `0.2.0-alpha.5` or numeric version `7`. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.
@@ -80,7 +82,8 @@ stop. Disabling should restore your wallpaper immediately.
 
 ## Build from source
 
-Build requirements: Python 3. Isolated tests: Node.js 22+.
+Build requirements: Python 3 and `glib-compile-schemas` (GLib tools).
+Isolated tests: Node.js 22+.
 
 ```sh
 git clone https://github.com/edjenn1998/gnome-fluid-smoke.git
@@ -90,8 +93,8 @@ python3 tools/package.py
 python3 -m zipfile -t dist/fluid-smoke@edjenn1998.github.io.shell-extension.zip
 ```
 
-Install the ZIP in `dist/` as described above. The source-only package builder
-uses a fixed file allowlist and deterministic timestamps.
+Install the ZIP in `dist/` as described above. The package builder uses a fixed
+file allowlist and deterministic timestamps, and includes the compiled GSettings schema.
 
 Optional developer checks (not extension dependencies):
 
@@ -104,8 +107,26 @@ npm run test:gpu
 
 ## Configuration and performance
 
-There is no preferences window yet. Developer viscosity/dissipation/confinement
-defaults are in `extension/core/simulation.js`; constructor overrides are validated.
+Open the extension's settings in the Extensions app, or run:
+
+```sh
+gnome-extensions prefs fluid-smoke@edjenn1998.github.io
+```
+
+Changes apply immediately and persist across sessions:
+
+| Setting | Range / choices | Default |
+| --- | --- | --- |
+| Smoke amount | 0.5–3× alpha.2 emission | 1.75× |
+| Color mode | Rainbow, single custom color, two-color blend | Rainbow |
+| Primary / second color | Color pickers; enabled for relevant modes | Blue / pink |
+| Linger time | 4–20 seconds; adjusts fade rate and idle clear together | 10 seconds |
+| Swirl | 4–10; gentle to livelier curls | 8 (alpha.2) |
+| Viscosity | 0.05–0.60; higher smooths flow more | 0.15 (alpha.2) |
+
+Reset to defaults restores every setting. Set smoke amount to 1× with the other
+settings at their defaults to reproduce alpha.2's emission and flow.
+New colors affect newly emitted smoke; existing smoke fades naturally.
 Disable/re-enable to pause and clear.
 GNOME reduced motion stops animation. Fullscreen monitors suspend; lock and
 Overview suspend the session. Display changes reset all fields.

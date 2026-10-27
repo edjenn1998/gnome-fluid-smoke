@@ -4,13 +4,15 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import * as simulation from '../extension/core/simulation.js';
 import * as shaders from '../extension/gpu/shaders.js';
+import * as settings from '../extension/core/settings.js';
 
 const context = vm.createContext({});
 const module = new vm.SourceTextModule(await readFile(
     new URL('../extension/gpu/feedback.js', import.meta.url), 'utf8'), {context});
 await module.link(specifier => {
     const exports = specifier === 'gi://Cogl' ? {default: {BufferBit: {COLOR: 1}}} :
-        specifier === './shaders.js' ? shaders : simulation;
+        specifier === './shaders.js' ? shaders :
+            specifier === '../core/settings.js' ? settings : simulation;
     return new vm.SyntheticModule(Object.keys(exports), function () {
         for (const [key, value] of Object.entries(exports))
             this.setExport(key, value);
@@ -61,7 +63,7 @@ const stop = scenario === 'fast' ? 30 : scenario === 'slow' ? 150 :
     scenario === 'circle' ? 180 : 90;
 for (let frame = 0; frame < stop + 90; frame++) {
     const segment = frame < stop ? [...point(frame), ...point(frame + 1)] : null;
-    fluid.step(1 / 60, segment, frame / 60 * 1.8);
+    fluid.step(1 / 60, segment, frame / 60 * 0.7);
     if ([Math.floor(stop * 2 / 3) - 1, stop - 1, stop + 29, stop + 89].includes(frame))
         commands.push({snapshot: frame, dye: fluid.dye[0].id});
 }

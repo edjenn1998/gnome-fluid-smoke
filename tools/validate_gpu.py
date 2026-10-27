@@ -312,7 +312,7 @@ def validate(gpu):
     assert abs(end[1] - start[1]) < 0.1, (start, end)
     print(f"No-input dye packet centroid, +1s: {start} -> {end} (expected +24 dye cells)")
 
-    # Overlapping dense sources must retain tint when density hits its cap.
+    # Alpha.2 bounds each dye channel independently when dense sources overlap.
     gpu.upload(velocity[0][0])
     gpu.upload(dye[0][0], [4, 2, 1, 4] * (dw * dh))
     transport(fs_emit=[1], fs_radius=[w * 10], fs_segment=[0.5, 0.5, 0.5, 0.5],
@@ -321,9 +321,8 @@ def validate(gpu):
     assert max(sample[3::4]) <= 4
     middle = 4 * ((dh // 2) * dw + dw // 2)
     red, green, blue, density = sample[middle:middle + 4]
-    assert abs(red / density - 1) < 0.002
-    assert abs(green / density - 0.5) < 0.002
-    assert abs(blue / density - 0.25) < 0.002
+    assert 0 <= blue <= green <= red <= 4
+    assert density == 4
 
     # Explicit viscosity must diffuse momentum while preserving uniform fields.
     gpu.upload(velocity[0][0], [12, 0, 0, 1] * (w * h))
@@ -336,7 +335,7 @@ def validate(gpu):
     diffused = gpu.read(velocity[1])[0::4]
     assert 0 < max(diffused) < 12 and min(diffused) >= 0
 
-    # Replay the production planner, sources and warm-started pass graph rather
+    # Replay the production planner, sources and alpha.2 pass graph rather
     # than maintaining a second solver whose tuning can drift from the extension.
     recording = json.loads(subprocess.check_output([
         'node', '--experimental-vm-modules', 'tools/preview_commands.js',

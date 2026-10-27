@@ -9,9 +9,11 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {locateMonitor, movementSegment} from '../core/coordinates.js';
 import {MonitorSurface} from './surface.js';
+import {readSettings} from '../core/settings.js';
 
 export class ProbeSession {
-    constructor({fps = 60} = {}) {
+    constructor({fps = 60, settings = null} = {}) {
+        this.settings = settings;
         this.signals = [];
         this.surfaces = [];
         this.source = 0;
@@ -41,6 +43,8 @@ export class ProbeSession {
         this.watch(Main.overview, 'hidden', () => this.refresh());
         this.watch(this.stSettings, 'notify::reduced-motion', () => this.refresh());
         this.watch(Main.screenShield, 'active-changed', () => this.refresh());
+        if (this.settings)
+            this.watch(this.settings, 'changed', () => this.applySettings());
         this.rebuild();
     }
 
@@ -103,11 +107,20 @@ export class ProbeSession {
                 this.surfaces.push(surface);
                 surface.initialize(this.group);
             }
+            this.applySettings();
             this.refresh();
         } catch (error) {
             this.destroy();
             throw error;
         }
+    }
+
+    applySettings() {
+        if (!this.settings)
+            return;
+        const options = readSettings(this.settings);
+        for (const surface of this.surfaces)
+            surface.configure(options);
     }
 
     tick() {
@@ -148,6 +161,7 @@ export class ProbeSession {
         this.group = null;
         this.tracker = null;
         this.stSettings = null;
+        this.settings = null;
         this.previous = null;
     }
 }

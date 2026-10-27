@@ -8,7 +8,7 @@ import {ProbeSession} from './shell/session.js';
 
 export default class FluidSmoke extends Extension {
     enable() {
-        this._session = new ProbeSession();
+        this._session = new ProbeSession({settings: this.getSettings()});
         try {
             this._session.start();
         } catch (error) {
