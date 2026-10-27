@@ -1,5 +1,22 @@
 # Validation record and acceptance checklist
 
+## 1.0.0 — 2026-10-27
+
+* User feedback on the latest work: “I like it. Publish as version 1.”
+  Approved for the first stable release with the alpha.7 simulation, rendering,
+  presets and defaults preserved unchanged.
+* Release metadata is 1.0.0, GNOME numeric version 10. Saved settings are retained.
+* All 24 isolated JS tests and 11 GLSL 1.20 compilation checks pass. Offscreen
+  RGBA16F validation passes on llvmpipe, including projection, transport,
+  post-input deformation, bounded lighting and exact black output. The optional
+  validation tools/libraries under `/tmp` were used as documented below.
+* Strict schema compilation, packaged ZIP integrity, version metadata and SHA-256
+  checksum verification pass. All ten extension source files other than metadata
+  are byte-identical to the alpha.7 tag.
+* User approval establishes visual acceptance; it does not supply measured
+  laptop frame rates or comprehensive monitor/session-layout coverage. Historical
+  alpha records below describe the evidence available at each prerelease.
+
 ## 0.2.0-alpha.7 — 2026-10-27
 
 See [REFERENCE_STYLES.md](REFERENCE_STYLES.md) for media analysis, exact preset

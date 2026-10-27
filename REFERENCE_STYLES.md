@@ -1,8 +1,9 @@
-# Alpha.7: preserve alpha.6 and explore the references
+# Reference styles: preserved alpha.6 and adjustable presets
 
 Alpha.6 is the default and an explicit **Alpha.6 — original** preset. The new
 reference presets are adjustable starting points, not a verified reproduction.
-Numeric version: 9. This is a test prerelease pending GNOME laptop testing.
+Introduced in alpha.7 and promoted unchanged to stable version 1.0.0 (numeric
+version 10) following user approval.
 
 ## What was studied
 
@@ -107,8 +108,9 @@ python3 tools/preview_gpu.py dist/reference-previews --scenario reversal --prese
 
 ## Install or return to alpha.6
 
-`dist/fluid-smoke@edjenn1998.github.io.shell-extension.zip` is alpha.7.
-Download it and the optional rollback ZIP from the alpha.7 release linked above;
+`dist/fluid-smoke@edjenn1998.github.io.shell-extension.zip` is version 1.0.0.
+Download it from the [stable release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v1.0.0).
+The optional rollback ZIP is available from the alpha.7 release linked above;
 when installing a download, use its actual path instead of the `dist/` path below.
 `dist/fluid-smoke-0.2.0-alpha.6.shell-extension.zip` is the separately packaged,
 unchanged original source, with its own SHA-256 sidecar. The original alpha.6
@@ -120,11 +122,11 @@ gnome-extensions install --force dist/fluid-smoke@edjenn1998.github.io.shell-ext
 ```
 
 Log out/back in on Wayland, then enable and open preferences. Expect
-`0.2.0-alpha.7`, numeric version 9. First try the Alpha.6 preset, then each
+`1.0.0`, numeric version 10. First try the Alpha.6 preset, then each
 reference preset with the same pointer gesture. Verify live controls, fresh
 strokes after idle clear, restart persistence, windows above the smoke, lock,
 Overview, fullscreen and disabling. Glow and fold shading need actual laptop
-frame-rate evaluation. Native preferences/Cogl testing is pending.
+frame-rate evaluation. See TESTING.md for the release validation record.
 
 For binary rollback, apply the Alpha.6 preset first (restoring the original
 keys), disable, install the separate alpha.6 ZIP, then log out/back in and enable.

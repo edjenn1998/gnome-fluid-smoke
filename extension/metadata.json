@@ -1,10 +1,10 @@
 {
   "uuid": "fluid-smoke@edjenn1998.github.io",
   "name": "Fluid Smoke",
-  "description": "Experimental interactive rainbow smoke wallpaper. GPU fluid flow, pressure projection and swirling dye on a black desktop. GNOME 51 Wayland. Alpha: on-device validation required. Generated with AI for personal use; maintainer review required before EGO submission.",
+  "description": "Interactive rainbow smoke wallpaper for GNOME 51 on Wayland. GPU fluid flow, swirling dye, adjustable smoke presets and live visual controls on a black desktop. Generated with AI for personal use; maintainer review required before EGO submission.",
   "shell-version": ["51"],
-  "version": 9,
-  "version-name": "0.2.0-alpha.7",
+  "version": 10,
+  "version-name": "1.0.0",
   "settings-schema": "org.gnome.shell.extensions.fluid-smoke",
   "url": "https://github.com/edjenn1998/gnome-fluid-smoke"
 }

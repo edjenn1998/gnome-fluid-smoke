@@ -5,14 +5,14 @@ Move the pointer to stir colored smoke across a black desktop, behind applicatio
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Status: 0.2.0-alpha.7 — reference-style test build
+## Version 1.0.0 — first stable release
 
-**Alpha.6 is preserved as the default and an explicit preset.** Preferences now
-also offer reference-photo and reference-video recipes, plus live plume width,
+**The user-approved alpha.7 build is now version 1.0.0.** Alpha.6 remains the
+default appearance and an explicit preset. Preferences also offer reference-photo
+and reference-video recipes, plus live plume width,
 momentum spread, rise, fine curls, brightness, glow, fold shading and color-speed
 controls. See [REFERENCE_STYLES.md](REFERENCE_STYLES.md) for the reference study,
 settings, previews, preservation check and installation/rollback guide.
-The new looks have offscreen previews; native visual acceptance remains pending.
 
 The fluid-simulation builds replace the original upward-drifting
 trails with mouse-driven velocity, buoyancy, swirling vorticity, pressure
@@ -24,12 +24,12 @@ injection. This build corrects incompatible pressure/projection stencils, keeps
 reduces dense source loading and optical saturation. Midpoint velocity tracing
 and smoothed confinement encourage larger rolling structures. Live preferences
 retain smoke amount, colors, linger time and modest swirl/viscosity adjustments.
-It is a test prerelease, not a final release.
+Version 1.0.0 preserves the approved simulation and rendering unchanged.
 
-The user tested `0.1.0-poc.2` and reported working visuals that looked cool but
-did not resemble smoke. The new shaders passed offscreen software-rendered
-numerical checks. **This alpha's appearance, multi-texture Cogl integration and
-performance still need GNOME laptop testing.** See [TESTING.md](TESTING.md).
+The visuals were refined through the alpha releases and approved by the user
+for version 1.0.0. Automated shader and GPU numerical checks supplement that
+feedback. See [TESTING.md](TESTING.md) for validation records and remaining
+hardware/performance coverage.
 
 ### Features
 
@@ -51,15 +51,17 @@ and target-hardware performance measurements are future work.
 ## Download and install
 
 Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
-[alpha.7 test prerelease](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.7).
-The release also includes `SHA256SUMS`, `fluid-smoke-alpha7-previews.zip`, and
-`fluid-smoke-0.2.0-alpha.6.shell-extension.zip` for binary rollback. Extract the
-previews archive and open `reference-previews/index.html` to see the new looks.
+[v1.0.0 stable release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v1.0.0).
+The release also includes `SHA256SUMS` to verify the extension ZIP.
+The [alpha.7 release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.7)
+retains `fluid-smoke-alpha7-previews.zip` and the separate original alpha.6
+rollback ZIP. Extract the previews archive and open `reference-previews/index.html`
+to see the reference-inspired looks.
 The [original alpha.6 release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.6)
 and its comparison archive remain available.
 The extension ZIP is available locally in `dist/` after `python3 tools/package.py`.
 See [FLUID_QUALITY.md](FLUID_QUALITY.md) for the investigation, controlled preview
-comparisons and native diagnostic instructions. Laptop visual acceptance remains pending.
+comparisons and native diagnostic instructions.
 
 For an existing installation, first disable it:
 
@@ -81,8 +83,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `0.2.0-alpha.7` / numeric version `9` for this build, or
-`0.2.0-alpha.6` / `8` for the published original. GNOME 51 / Wayland is the
+Expect version `1.0.0` / numeric version `10` for this build. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.

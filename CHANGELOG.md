@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 — 2026-10-27 (first stable release)
+
+* Promoted the user-approved alpha.7 visuals and controls to the first stable release.
+* Preserved the alpha.6 default appearance, original preset, photo/video-inspired
+  presets, live visual controls and existing saved settings.
+* Updated release metadata and installation documentation. No simulation or
+  rendering changes from alpha.7. GNOME numeric version 10.
+
 ## 0.2.0-alpha.7 — 2026-10-27 (reference-style test prerelease)
 
 * Preserved alpha.6 as the default and an explicit original preset. Same-driver
