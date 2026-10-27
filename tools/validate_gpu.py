@@ -188,7 +188,9 @@ class GPU:
                          fs_velocity_decay=[self.parameters['velocityDissipation']],
                          fs_dye_decay=[self.parameters['dyeDissipation']],
                          fs_viscosity=[self.parameters['viscosity']],
-                         fs_vorticity=[self.parameters['vorticity']])
+                         fs_vorticity=[self.parameters['vorticity']],
+                         fs_buoyancy=[self.parameters.get('buoyancy', 6)],
+                         fs_detail=[0], fs_brightness=[1], fs_glow=[0], fs_folds=[0])
         defaults.update(uniforms)
         for key, values in defaults.items():
             location = self.call("glGetUniformLocation", program, key.encode())
@@ -385,12 +387,23 @@ def validate(gpu):
     gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
     displayed = gpu.read(scratch)
     assert all(value == 1 for value in displayed[3::4])
+    # Optional presentation branches must remain finite and opaque even at
+    # maximum exposure, halo and relief; zero input must stay exactly black.
+    lighting_cases = [(1, 0, 0), (2.4, .4, .35), (2.1, .25, .65), (4, 1, 1)]
+    for brightness, glow, folds in lighting_cases:
+        gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1],
+                 fs_brightness=[brightness], fs_glow=[glow], fs_folds=[folds])
+        result = gpu.read(scratch)
+        assert all(math.isfinite(v) and 0 <= v <= 1 for v in result)
+        assert all(v == 1 for v in result[3::4])
     print(f"Smoke density totals after emission / +1s / +2s / +3s: {[round(v, 3) for v in densities]}")
     print(f"After input stops: dye centroids {centers}; normalized shape change L1 {shape_change:.3f}")
     # Zero dye presents exact black, including opaque alpha.
     gpu.upload(dye[0][0])
-    gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
-    assert all(v == 0 for i, v in enumerate(gpu.read(scratch)) if i % 4 != 3)
+    for brightness, glow, folds in lighting_cases:
+        gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1],
+                 fs_brightness=[brightness], fs_glow=[glow], fs_folds=[folds])
+        assert all(v == 0 for i, v in enumerate(gpu.read(scratch)) if i % 4 != 3)
     # Same signed three-layer sentinel as the native developer view. This checks
     # the diagnostic itself; native Cogl binding must still be checked on-device.
     sentinels = [gpu.target([-.25, 0, 0, 0], 1, 1),

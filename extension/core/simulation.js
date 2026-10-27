@@ -14,11 +14,20 @@ export const DEFAULT_PARAMETERS = Object.freeze({
     dyeDissipation: 0.65,
     vorticity: 8,
     smokeAmount: 1.75,
+    sourceWidth: 1,
+    momentumSpread: 2.5,
+    buoyancy: 6,
+    fineDetail: 0,
+    brightness: 1,
+    glow: 0,
+    foldShading: 0,
 });
 
 export function simulationParameters(overrides = {}) {
     const limits = {viscosity: [0, 3], velocityDissipation: [0, 4],
-        dyeDissipation: [0.1, 4], vorticity: [0, 12], smokeAmount: [0.5, 3]};
+        dyeDissipation: [0.1, 4], vorticity: [0, 12], smokeAmount: [0.5, 3],
+        sourceWidth: [0.5, 4], momentumSpread: [1, 4], buoyancy: [0, 18],
+        fineDetail: [0, 1], brightness: [0.5, 4], glow: [0, 1], foldShading: [0, 1]};
     return Object.fromEntries(Object.entries(DEFAULT_PARAMETERS).map(([name, fallback]) => {
         const value = overrides[name] ?? fallback;
         if (!Number.isFinite(value))

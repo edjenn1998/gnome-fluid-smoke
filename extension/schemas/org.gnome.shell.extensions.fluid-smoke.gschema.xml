@@ -14,16 +14,48 @@
       <summary>Seconds smoke fades before clearing after the last motion</summary>
     </key>
     <key name="swirl" type="d">
-      <range min="4.0" max="10.0"/><default>8.0</default>
+      <range min="4.0" max="12.0"/><default>8.0</default>
       <summary>Strength of small fluid curls</summary>
     </key>
     <key name="viscosity" type="d">
       <range min="0.05" max="0.6"/><default>0.15</default>
       <summary>Fluid viscosity in grid cells squared per second</summary>
     </key>
+    <key name="source-width" type="d">
+      <range min="0.5" max="4.0"/><default>1.0</default>
+      <summary>Plume width relative to alpha.6</summary>
+    </key>
+    <key name="momentum-spread" type="d">
+      <range min="1.0" max="4.0"/><default>2.5</default>
+      <summary>Momentum radius relative to the dye radius</summary>
+    </key>
+    <key name="buoyancy" type="d">
+      <range min="0.0" max="18.0"/><default>6.0</default>
+      <summary>Upward acceleration per density unit in flow cells per second squared</summary>
+    </key>
+    <key name="fine-detail" type="d">
+      <range min="0.0" max="1.0"/><default>0.0</default>
+      <summary>Blend from smooth rolls to cell-scale curl confinement</summary>
+    </key>
+    <key name="brightness" type="d">
+      <range min="0.5" max="4.0"/><default>1.0</default>
+      <summary>Smoke exposure multiplier</summary>
+    </key>
+    <key name="glow" type="d">
+      <range min="0.0" max="1.0"/><default>0.0</default>
+      <summary>Soft halo around luminous smoke</summary>
+    </key>
+    <key name="fold-shading" type="d">
+      <range min="0.0" max="1.0"/><default>0.0</default>
+      <summary>Density-gradient relief lighting, not volumetric depth</summary>
+    </key>
     <key name="color-mode" type="s">
       <choices><choice value="rainbow"/><choice value="solid"/><choice value="gradient"/></choices>
       <default>'rainbow'</default><summary>Smoke color mode</summary>
+    </key>
+    <key name="color-speed" type="d">
+      <range min="0.2" max="4.0"/><default>1.0</default>
+      <summary>Rainbow and two-color cycling rate relative to alpha.6</summary>
     </key>
     <key name="primary-color" type="s">
       <default>'#66ccff'</default><summary>Primary smoke color in #RRGGBB format</summary>

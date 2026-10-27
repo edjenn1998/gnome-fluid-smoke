@@ -32,7 +32,7 @@ const source = `
 `;
 
 export const advectVelocity = {
-    declarations: grid + source + 'uniform vec2 fs_impulse; uniform float fs_velocity_decay;',
+    declarations: grid + source + 'uniform vec2 fs_impulse; uniform float fs_velocity_decay; uniform float fs_buoyancy;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 v = velocity(uv);
@@ -40,7 +40,7 @@ export const advectVelocity = {
         vec2 back = bounded(uv - fs_dt * velocity(mid) / fs_size);
         v = velocity(back) * exp(-fs_velocity_decay * fs_dt);
         float density = texture2D(cogl_sampler1, uv).a;
-        v.y -= min(density, 2.0) * 6.0 * fs_dt;
+        v.y -= min(density, 2.0) * fs_buoyancy * fs_dt;
         v += (fs_impulse - v) * splat(uv) * (1.0 - exp(-30.0 * fs_dt));
         float speed = length(v);
         v *= min(1.0, 180.0 / max(speed, 0.0001));
@@ -76,7 +76,7 @@ export const curl = {
 };
 
 export const confine = {
-    declarations: grid + 'uniform float fs_vorticity;',
+    declarations: grid + 'uniform float fs_vorticity; uniform float fs_detail;',
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 h = 2.0 / fs_size;
@@ -87,6 +87,19 @@ export const confine = {
         vec2 n = vec2(abs(r) - abs(l), abs(b) - abs(t));
         n /= max(length(n), 0.0001);
         float c = (4.0 * texture2D(cogl_sampler1, uv).r + l + r + t + b) * 0.125;
+        // Blend toward cell-scale confinement for frilled cloud edges. This is
+        // driven by transported curl, not procedural noise or a painted texture.
+        if (fs_detail > 0.0) {
+            vec2 q = 1.0 / fs_size;
+            float fl = texture2D(cogl_sampler1, bounded(uv - vec2(q.x, 0.0))).r;
+            float fr = texture2D(cogl_sampler1, bounded(uv + vec2(q.x, 0.0))).r;
+            float ft = texture2D(cogl_sampler1, bounded(uv - vec2(0.0, q.y))).r;
+            float fb = texture2D(cogl_sampler1, bounded(uv + vec2(0.0, q.y))).r;
+            vec2 fn = vec2(abs(fr) - abs(fl), abs(fb) - abs(ft));
+            fn /= max(length(fn), 0.0001);
+            n = mix(n, fn, fs_detail);
+            c = mix(c, texture2D(cogl_sampler1, uv).r, fs_detail);
+        }
         vec2 v = velocity(uv) + vec2(n.y, -n.x) * c * (fs_vorticity * fs_dt);
         v *= min(1.0, 180.0 / max(length(v), 0.0001));
         cogl_color_out = vec4(v, 0.0, 1.0);
@@ -187,13 +200,52 @@ export const correctDye = {
 };
 
 export const presentation = {
-    declarations: 'uniform float fs_opacity;',
+    declarations: `
+        uniform float fs_opacity;
+        uniform vec2 fs_dye_size;
+        uniform float fs_brightness;
+        uniform float fs_glow;
+        uniform float fs_folds;
+        vec3 luminous(vec4 dye) {
+            return max(dye.rgb / max(dye.a, 0.0001), vec3(0.0))
+                * (1.0 - exp(-1.1 * dye.a));
+        }
+    `,
     body: `
         vec4 dye = texture2D(cogl_sampler0, cogl_tex_coord_in[0].xy);
         vec3 tint = dye.rgb / max(dye.a, 0.0001);
         float opacity = 1.0 - exp(-1.1 * dye.a);
         // Do not amplify near-zero cell/interpolation errors with gamma < 1.
         vec3 color = max(tint * opacity, vec3(0.0));
+        vec2 uv = cogl_tex_coord_in[0].xy;
+        if (fs_folds > 0.0) {
+            vec2 h = 2.0 / fs_dye_size;
+            float l = texture2D(cogl_sampler0, uv - vec2(h.x, 0.0)).a;
+            float r = texture2D(cogl_sampler0, uv + vec2(h.x, 0.0)).a;
+            float t = texture2D(cogl_sampler0, uv - vec2(0.0, h.y)).a;
+            float b = texture2D(cogl_sampler0, uv + vec2(0.0, h.y)).a;
+            vec3 normal = normalize(vec3(5.0 * (l-r), 5.0 * (t-b), 1.0));
+            float light = 0.55 + 0.8 * max(dot(normal, normalize(vec3(-0.4, -0.5, 1.0))), 0.0);
+            color *= mix(1.0, light, fs_folds);
+        }
+        if (fs_glow > 0.0) {
+            // Two sparse blur rings; no extra targets/passes. Exact black stays
+            // black and alpha.6 takes neither optional sampling branch.
+            vec3 halo = vec3(0.0);
+            for (int i = 1; i <= 2; i++) {
+                vec2 h = float(i) * 12.0 / fs_dye_size;
+                halo += luminous(texture2D(cogl_sampler0, uv + vec2(h.x, 0.0)));
+                halo += luminous(texture2D(cogl_sampler0, uv - vec2(h.x, 0.0)));
+                halo += luminous(texture2D(cogl_sampler0, uv + vec2(0.0, h.y)));
+                halo += luminous(texture2D(cogl_sampler0, uv - vec2(0.0, h.y)));
+            }
+            color += fs_glow * halo * 0.125;
+        }
+        color *= fs_brightness;
+        // Soft shoulder only above the old output range; alpha.6 is unchanged.
+        if (fs_brightness > 1.0)
+            color = min(color, vec3(0.8)) + vec3(0.2) *
+                (vec3(1.0) - exp(-max(color - vec3(0.8), vec3(0.0)) * 5.0));
         cogl_color_out = vec4(color * fs_opacity, fs_opacity);
     `,
 };

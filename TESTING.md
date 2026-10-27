@@ -1,5 +1,20 @@
 # Validation record and acceptance checklist
 
+## 0.2.0-alpha.7 — 2026-10-27
+
+See [REFERENCE_STYLES.md](REFERENCE_STYLES.md) for media analysis, exact preset
+recipes, original-alpha.6 preservation evidence, previews and installation.
+
+* 24 JS tests pass, including schema-default parity and full preset restoration.
+* 11 GLSL 1.20 shaders compile; hardware RGBA16F numerical checks pass, including
+  bounded optional lighting and exact black at preset/maximum lighting values.
+* Original alpha.6 versus new default rapid-circle snapshots are byte-identical
+  at stop/+1/+2/+3s on the same Radeon 8060S / radeonsi driver.
+* Photo fast/sweep and video fast/reversal previews generated and inspected;
+  finite states and density cap checked at each snapshot.
+* Native GNOME preferences, Cogl output, reference likeness and laptop frame
+  rate remain pending. GitHub test prerelease, numeric version 9.
+
 ## 0.2.0-alpha.6 — 2026-10-27
 
 See [FLUID_QUALITY.md](FLUID_QUALITY.md) for source findings, historical comparison,

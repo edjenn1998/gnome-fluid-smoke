@@ -35,6 +35,7 @@ def main():
     parser.add_argument('--scenario', choices=['sweep', 'slow', 'fast', 'circle', 'reversal'], default='sweep')
     parser.add_argument('--root', type=Path, default=ROOT, help='Shader/solver checkout to compare')
     parser.add_argument('--label', default='candidate')
+    parser.add_argument('--preset', choices=['alpha6', 'photo', 'video'], default='alpha6')
     parser.add_argument('--pressure-iterations', type=int, default=24)
     parser.add_argument('--cold', action='store_true', help='Restart pressure each substep')
     parser.add_argument('--warm', action='store_true', help='Skip recorded pressure clears (historical solver comparison)')
@@ -48,7 +49,7 @@ def main():
         parser.error('pressure iterations must be even and at least 24')
     recording = json.loads(subprocess.check_output(
         ['node', '--experimental-vm-modules', 'tools/preview_commands.js', args.scenario], cwd=ROOT,
-        env={**os.environ, 'FLUID_ROOT': str(args.root.resolve())}))
+        env={**os.environ, 'FLUID_ROOT': str(args.root.resolve()), 'FLUID_PRESET': args.preset}))
     gpu = GPU(recording['width'], recording['height'], root=args.root)
     if args.ablation in ('centered-projection', 'local-confinement'):
         if not args.historical_root:
@@ -89,7 +90,7 @@ def main():
                 gpu.clear(targets[command['clear']])
             elif 'snapshot' in command:
                 gpu.draw('presentation', screen, [targets[command['dye']]],
-                         fs_opacity=[1], fs_dye_size=[width, height])
+                         fs_opacity=[1], fs_dye_size=[width, height], **recording['presentation'])
                 pixels = gpu.read(screen)
                 images.append(pixels)
                 density = gpu.read(targets[command['dye']])[3::4]
@@ -98,6 +99,8 @@ def main():
                 center = [sum((i % width) * d for i, d in enumerate(normalized)),
                           sum((i // width) * d for i, d in enumerate(normalized))]
                 velocity = gpu.read(targets[command['velocity']])
+                assert all(math.isfinite(v) for field in [pixels, density, velocity] for v in field), 'Nonfinite rendered state'
+                assert min(density) >= -0.0001 and max(density) <= 4.01, 'Density bounds exceeded'
                 gpu.draw('curl', measure, [targets[command['velocity']]])
                 curls = gpu.read(measure)[0::4]
                 before = gpu.read(targets[command['divergence']])[0::4]
@@ -147,7 +150,7 @@ def main():
                                  [targets[i] for i in command['inputs']])
                         draws += 2
                     pressure_index = 0
-        report = dict(label=args.label, scenario=args.scenario, root=str(args.root),
+        report = dict(label=args.label, scenario=args.scenario, root=str(args.root), preset=args.preset,
             pressureIterations=args.pressure_iterations, cold=args.cold,
             forceWarm=args.warm,
             ablation=args.ablation,

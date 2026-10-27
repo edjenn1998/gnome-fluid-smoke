@@ -50,6 +50,21 @@ class Recorder extends module.namespace.FluidSimulation {
     }
 }
 const fluid = new Recorder(null, Number(process.argv[3] ?? 320), Number(process.argv[4] ?? 180));
+const presetName = process.env.FLUID_PRESET ?? 'alpha6';
+let presentation = {fs_brightness: [1], fs_glow: [0], fs_folds: [0]};
+if (settings.PRESETS) {
+    const values = settings.PRESETS[presetName];
+    if (!values)
+        throw new Error(`Unknown preset: ${presetName}`);
+    const options = settings.readSettings({get_double: key => values[key],
+        get_string: key => key === 'debug-view' ? 'normal' : values[key]});
+    fluid.parameters = simulation.simulationParameters(options.parameters);
+    fluid.appearance = options.appearance;
+    presentation = {fs_brightness: [fluid.parameters.brightness],
+        fs_glow: [fluid.parameters.glow], fs_folds: [fluid.parameters.foldShading]};
+} else if (presetName !== 'alpha6') {
+    throw new Error('Historical build only supports the alpha6 preview');
+}
 fluid.initialize();
 // Exercise different pointer speeds and repeated stirring with the same solver.
 const scenario = process.argv[2] ?? 'sweep';
@@ -73,4 +88,4 @@ for (let frame = 0; frame < stop + 180; frame++) {
             dye: fluid.dye[0].id, velocity: fluid.velocity[0].id,
             divergence: fluid.divergence.id});
 }
-console.log(JSON.stringify({width: fluid.width, height: fluid.height, targets, commands}));
+console.log(JSON.stringify({width: fluid.width, height: fluid.height, targets, commands, presentation}));

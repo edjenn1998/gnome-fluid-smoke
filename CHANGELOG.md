@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0-alpha.7 — 2026-10-27 (reference-style test prerelease)
+
+* Preserved alpha.6 as the default and an explicit original preset. Same-driver
+  rapid-circle replay produces identical stop/+1/+2/+3s PNGs to original alpha.6.
+* Studied the supplied photo and decoded the 15-second reference video. Added
+  adjustable photo/video-inspired recipes and plume width, momentum spread,
+  rise, fine curls, brightness, glow, fold shading and color cycling speed.
+* Retained the solver/pass budget and lifecycle. Optional confinement and
+  lighting use additional sampling but no new targets or simulation passes.
+* Extended preview tooling with presets and finite/bounded state checks; added
+  schema/preset restoration tests. Packaged an independent original alpha.6 ZIP.
+* Numeric version 9; 24 JS tests and 11 GLSL checks pass. Offscreen GPU checks
+  pass; native appearance, preferences UI and laptop performance remain pending.
+  See REFERENCE_STYLES.md. GitHub test prerelease.
+
 ## 0.2.0-alpha.6 — 2026-10-27 (fluid-quality test prerelease)
 
 * Kept the existing Cogl multipass solver and all session/integration features.

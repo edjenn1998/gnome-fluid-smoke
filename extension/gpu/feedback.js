@@ -96,7 +96,8 @@ export class FluidSimulation {
         const color = smokeColor(hue, this.appearance);
         for (const {dt, segment: part, impulse} of steps) {
             // Resolve a modest filament inside a wider momentum/shear envelope.
-            const radius = Math.max(1.5, Math.min(this.width, this.height) * 0.014);
+            const radius = Math.max(1.5, Math.min(this.width, this.height) * 0.014) *
+                this.parameters.sourceWidth;
             const injection = {
                 fs_segment: part ?? [0, 0, 0, 0],
                 fs_emit: [part ? 1 : 0],
@@ -108,12 +109,13 @@ export class FluidSimulation {
                 this.velocity.reverse();
             }
             this.draw('advectVelocity', this.velocity[1], [this.velocity[0], this.dye[0]], dt,
-                {...injection, fs_radius: [radius * 2.5], fs_impulse: impulse,
+                {...injection, fs_radius: [radius * this.parameters.momentumSpread], fs_impulse: impulse,
+                    fs_buoyancy: [this.parameters.buoyancy],
                     fs_velocity_decay: [this.parameters.velocityDissipation]});
             this.velocity.reverse();
             this.draw('curl', this.curl, [this.velocity[0]], dt);
             this.draw('confine', this.velocity[1], [this.velocity[0], this.curl], dt,
-                {fs_vorticity: [this.parameters.vorticity]});
+                {fs_vorticity: [this.parameters.vorticity], fs_detail: [this.parameters.fineDetail]});
             this.velocity.reverse();
             this.draw('divergence', this.divergence, [this.velocity[0]], dt);
             // Keep the previous pressure as an initial guess. Lifecycle clear()
@@ -169,6 +171,12 @@ export class FluidSimulation {
             }
         }
         uniform(pipeline, 'fs_opacity', [opacity / 255]);
+        if (mode <= 0) {
+            uniform(pipeline, 'fs_dye_size', [this.dyeWidth, this.dyeHeight]);
+            uniform(pipeline, 'fs_brightness', [this.parameters.brightness]);
+            uniform(pipeline, 'fs_glow', [this.parameters.glow]);
+            uniform(pipeline, 'fs_folds', [this.parameters.foldShading]);
+        }
         return pipeline;
     }
 

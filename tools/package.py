@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Build a deterministic GNOME extension archive with compiled settings; no installation."""
 import hashlib
+import argparse
 import json
 import subprocess
 import tempfile
@@ -18,14 +19,19 @@ FILES = [
 
 
 def main():
-    metadata = json.loads((ROOT / "extension/metadata.json").read_text())
-    output = ROOT / "dist" / f"{metadata['uuid']}.shell-extension.zip"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source-root', type=Path, default=ROOT)
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args()
+    root = args.source_root
+    metadata = json.loads((root / "extension/metadata.json").read_text())
+    output = args.output or ROOT / "dist" / f"{metadata['uuid']}.shell-extension.zip"
     output.parent.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="fluid-smoke-schemas-") as temporary:
         subprocess.run(["glib-compile-schemas", "--strict", f"--targetdir={temporary}",
-                        str(ROOT / "extension/schemas")], check=True)
-        sources = {name: (ROOT / "extension" / name).read_bytes() for name in FILES}
-        sources["LICENSE"] = (ROOT / "LICENSE").read_bytes()
+                        str(root / "extension/schemas")], check=True)
+        sources = {name: (root / "extension" / name).read_bytes() for name in FILES}
+        sources["LICENSE"] = (root / "LICENSE").read_bytes()
         sources["schemas/gschemas.compiled"] = (Path(temporary) / "gschemas.compiled").read_bytes()
     with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
         for name, data in sorted(sources.items()):
@@ -37,7 +43,8 @@ def main():
         assert archive.testzip() is None
         assert set(archive.namelist()) == set(sources)
     digest = hashlib.sha256(output.read_bytes()).hexdigest()
-    output.with_name("SHA256SUMS").write_text(f"{digest}  {output.name}\n")
+    checksum = output.with_name("SHA256SUMS") if args.output is None else output.with_suffix('.zip.sha256')
+    checksum.write_text(f"{digest}  {output.name}\n")
     print(f"Package: {output}")
     print(f"SHA256: {digest}")
 
