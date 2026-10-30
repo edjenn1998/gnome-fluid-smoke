@@ -5,6 +5,7 @@ export const SETTING_KEYS = Object.freeze([
     'color-mode', 'primary-color', 'secondary-color',
     'source-width', 'momentum-spread', 'buoyancy', 'fine-detail',
     'brightness', 'glow', 'fold-shading', 'color-speed',
+    'background-mode', 'background-color',
 ]);
 
 // Full visual recipes. Alpha.6 is also the schema default; existing installs
@@ -43,6 +44,10 @@ export function readSettings(settings) {
     return {
         lingerTime,
         debugView: settings.get_string('debug-view'),
+        background: {
+            mode: settings.get_string('background-mode'),
+            color: settings.get_string('background-color'),
+        },
         parameters: {
             smokeAmount: settings.get_double('smoke-amount'),
             dyeDissipation: 6.5 / lingerTime,

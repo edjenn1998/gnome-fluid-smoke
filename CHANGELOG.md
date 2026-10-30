@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 — 2026-10-30
+
+* Added live Background mode preferences: keep the current GNOME wallpaper or
+  use a solid color, with a background color picker. Solid black stays the default.
+* Added premultiplied smoke compositing so empty areas reveal the wallpaper and
+  smoke/glow blend over the selected backdrop without changing wallpaper settings.
+* Background changes repaint immediately even while idle. Smoke presets preserve
+  the background choice; Reset to defaults also resets background preferences.
+* Updated version to GNOME numeric version 11 and added background conversion,
+  idle-repaint and offscreen GPU compositing checks.
+
 ## 1.0.0 — 2026-10-27 (first stable release)
 
 * Promoted the user-approved alpha.7 visuals and controls to the first stable release.

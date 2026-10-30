@@ -17,7 +17,7 @@ test('custom colors support solid and smoothly blended colors with safe invalid-
     assert.ok(smokeColor(10).every(value => value >= 0.1 && value <= 1));
 });
 
-test('alpha6 recipe matches every schema default and original simulation values', () => {
+test('alpha6 recipe matches smoke defaults and background defaults preserve solid black', () => {
     const schema = readFileSync(new URL('../extension/schemas/org.gnome.shell.extensions.fluid-smoke.gschema.xml', import.meta.url), 'utf8');
     const defaults = {};
     for (const match of schema.matchAll(/<key name="([^"]+)" type="([^"]+)">([\s\S]*?)<\/key>/g)) {
@@ -26,11 +26,29 @@ test('alpha6 recipe matches every schema default and original simulation values'
         const value = match[3].match(/<default>(.*?)<\/default>/)[1];
         defaults[match[1]] = match[2] === 's' ? value.slice(1, -1) : Number(value);
     }
-    assert.deepEqual(defaults, PRESETS.alpha6);
+    const {['background-mode']: backgroundMode, ['background-color']: backgroundColor, ...smokeDefaults} = defaults;
+    assert.deepEqual(smokeDefaults, PRESETS.alpha6);
+    assert.equal(backgroundMode, 'solid');
+    assert.equal(backgroundColor, '#000000');
     assert.deepEqual(Object.keys(defaults).sort(), [...SETTING_KEYS].sort());
     const options = readSettings({get_double: key => defaults[key], get_string: key => defaults[key]});
     assert.deepEqual(simulationParameters(options.parameters), DEFAULT_PARAMETERS);
     assert.equal(options.appearance.speed, 1);
+    assert.deepEqual(options.background, {mode: 'solid', color: '#000000'});
+});
+
+test('background settings reach the renderer and smoke presets preserve the background', () => {
+    const values = {...PRESETS.alpha6, 'background-mode': 'wallpaper', 'background-color': '#123456'};
+    const settings = {get_double: key => values[key], get_string: key => values[key],
+        set_double: (key, value) => { values[key] = value; },
+        set_string: (key, value) => { values[key] = value; }};
+    for (const name of Object.keys(PRESETS)) {
+        applyPreset(settings, name);
+        assert.deepEqual(readSettings(settings).background, {mode: 'wallpaper', color: '#123456'});
+    }
+    values['background-mode'] = 'solid';
+    assert.deepEqual(readSettings(settings).background, {mode: 'solid', color: '#123456'});
+    assert.deepEqual(parseColor('invalid', '#000000'), [0, 0, 0]);
 });
 
 test('all presets apply complete in-range recipes and alpha6 restores reference changes', () => {

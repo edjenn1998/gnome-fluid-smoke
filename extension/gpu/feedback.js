@@ -4,7 +4,7 @@
 import Cogl from 'gi://Cogl';
 import * as Shaders from './shaders.js';
 import {planSteps, PRESSURE_ITERATIONS, simulationParameters} from '../core/simulation.js';
-import {smokeColor} from '../core/settings.js';
+import {parseColor, smokeColor} from '../core/settings.js';
 
 function makePipeline(context, shader, layers) {
     const pipeline = Cogl.Pipeline.new(context);
@@ -66,6 +66,7 @@ export class FluidSimulation {
                 ['curl', 'divergence', 'diffuseVelocity', 'presentation'].includes(name) ? 1 : 2;
             this.pipelines[name] = makePipeline(this.context, Shaders[name], layers);
         }
+        this.pipelines.presentation.set_blend('RGBA = ADD (SRC_COLOR, DST_COLOR * (1-SRC_COLOR[A]))');
         this.clear();
     }
 
@@ -172,6 +173,8 @@ export class FluidSimulation {
         }
         uniform(pipeline, 'fs_opacity', [opacity / 255]);
         if (mode <= 0) {
+            uniform(pipeline, 'fs_wallpaper', [this.background?.mode === 'wallpaper' ? 1 : 0]);
+            uniform(pipeline, 'fs_background', parseColor(this.background?.color, '#000000'));
             uniform(pipeline, 'fs_dye_size', [this.dyeWidth, this.dyeHeight]);
             uniform(pipeline, 'fs_brightness', [this.parameters.brightness]);
             uniform(pipeline, 'fs_glow', [this.parameters.glow]);

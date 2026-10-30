@@ -6,11 +6,18 @@ https://github.com/user-attachments/assets/0c146518-fa6c-4e6b-994d-b53b2beba1fd
 # Fluid Smoke
 
 Interactive rainbow smoke wallpaper for **GNOME Shell 51 on Wayland**.
-Move the pointer to stir colored smoke across a black desktop, behind applications
+Move the pointer to stir colored smoke over your wallpaper or a custom solid color, behind applications
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Version 1.0.0 — first stable release
+## Version 1.1.0 — wallpaper and background colors
+
+Preferences now include **Background mode → Keep wallpaper / Solid color** and a
+**Background color** picker. Changes apply immediately, including while smoke is
+idle. Solid black remains the default. Your GNOME wallpaper settings are never
+modified, and smoke appearance presets preserve your background choice.
+
+### First stable release
 
 **The user-approved alpha.7 build is now version 1.0.0.** Alpha.6 remains the
 default appearance and an explicit preset. Preferences also offer reference-photo
@@ -44,7 +51,8 @@ hardware/performance coverage.
 - Divergence calculation, 24 Jacobi pressure iterations and velocity projection.
 - Smooth pointer-segment injection with capped momentum and changing RGB color.
 - Live preferences for amount, colors, lingering and fluid motion.
-- Black background, configurable idle clear (ten seconds by default) and simulation suspension.
+- Keep your wallpaper or choose a solid background color (black by default).
+- Configurable idle clear (ten seconds by default) and simulation suspension.
 - Pointer observation over applications without capturing input.
 - Monitor rebuild, fullscreen, lock, Overview and reduced-motion suspension.
 - Lifecycle cleanup and rollback on initialization/runtime errors.
@@ -56,7 +64,7 @@ and target-hardware performance measurements are future work.
 ## Download and install
 
 Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
-[v1.0.0 stable release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v1.0.0).
+[v1.1.0 stable release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v1.1.0).
 The release also includes `SHA256SUMS` to verify the extension ZIP.
 The [alpha.7 release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.7)
 retains `fluid-smoke-alpha7-previews.zip` and the separate original alpha.6
@@ -88,7 +96,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `1.0.0` / numeric version `10` for this build. GNOME 51 / Wayland is the
+Expect version `1.1.0` / numeric version `11` for this build. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.
@@ -98,8 +106,9 @@ the runtime dependencies.
 Move the mouse in circles, then stop. Look for curls, rising wisps and dispersal
 rather than a line tracing the cursor. Try slow and fast motion. Move over
 Firefox, then move/minimize it to reveal smoke generated underneath. After ten
-seconds without motion the desktop should be exactly black and simulation should
-stop. Disabling should restore your wallpaper immediately.
+seconds without motion the smoke should clear to your wallpaper or selected solid
+color and simulation should stop. Try both background modes and change the solid
+color while idle to check the immediate update. Disabling restores your wallpaper.
 
 ## Build from source
 
@@ -138,6 +147,8 @@ Changes apply immediately and persist across sessions:
 
 | Setting | Range / choices | Default |
 | --- | --- | --- |
+| Background mode | Keep wallpaper, solid color | Solid color |
+| Background color | Color picker; enabled for solid background | Black (#000000) |
 | Smoke amount | 0.5–3× source strength (dense sources self-limit) | 1.75× |
 | Color mode | Rainbow, single custom color, two-color blend | Rainbow |
 | Primary / second color | Color pickers; enabled for relevant modes | Blue / pink |

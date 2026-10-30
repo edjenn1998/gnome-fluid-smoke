@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {planSteps, MAX_STEP, MAX_SUBSTEPS, PRESSURE_ITERATIONS,
     simulationParameters} from '../extension/core/simulation.js';
 import * as shaders from '../extension/gpu/shaders.js';
-import {smokeColor} from '../extension/core/settings.js';
+import {parseColor, smokeColor} from '../extension/core/settings.js';
 
 test('time planner bounds stalls and rejects invalid or nonpositive elapsed time', () => {
     for (const dt of [0, -1, Infinity, NaN])
@@ -75,7 +75,7 @@ async function fixture({failAllocation = 0} = {}) {
     await module.link(specifier => {
         const exports = specifier === 'gi://Cogl' ? {default: Cogl} :
             specifier === './shaders.js' ? shaders :
-                specifier === '../core/settings.js' ? {smokeColor} :
+                specifier === '../core/settings.js' ? {parseColor, smokeColor} :
                     {planSteps, PRESSURE_ITERATIONS, simulationParameters};
         return new vm.SyntheticModule(Object.keys(exports), function () {
             for (const [key, value] of Object.entries(exports))
@@ -85,6 +85,25 @@ async function fixture({failAllocation = 0} = {}) {
     await module.evaluate();
     return {Simulation: module.namespace.FluidSimulation, draws, targets};
 }
+
+test('background presentation uniforms support wallpaper, solid color and safe fallback', async () => {
+    const f = await fixture();
+    const fluid = new f.Simulation({}, 64, 36);
+    fluid.initialize();
+    let pipeline = fluid.presentationPipeline(255);
+    assert.deepEqual([...pipeline.uniforms.fs_wallpaper], [0]);
+    assert.deepEqual([...pipeline.uniforms.fs_background], [0, 0, 0]);
+    fluid.background = {mode: 'wallpaper', color: '#123456'};
+    pipeline = fluid.presentationPipeline(128);
+    assert.deepEqual([...pipeline.uniforms.fs_wallpaper], [1]);
+    assert.deepEqual([...pipeline.uniforms.fs_background], parseColor('#123456'));
+    assert.equal(pipeline.uniforms.fs_opacity[0], 128 / 255);
+    fluid.background = {mode: 'solid', color: 'invalid'};
+    pipeline = fluid.presentationPipeline(255);
+    assert.deepEqual([...pipeline.uniforms.fs_wallpaper], [0]);
+    assert.deepEqual([...pipeline.uniforms.fs_background], [0, 0, 0]);
+    fluid.destroy();
+});
 
 test('solver pass graph avoids feedback, projects before dye, and clears all fields', async () => {
     const f = await fixture();

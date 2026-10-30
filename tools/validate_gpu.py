@@ -190,7 +190,8 @@ class GPU:
                          fs_viscosity=[self.parameters['viscosity']],
                          fs_vorticity=[self.parameters['vorticity']],
                          fs_buoyancy=[self.parameters.get('buoyancy', 6)],
-                         fs_detail=[0], fs_brightness=[1], fs_glow=[0], fs_folds=[0])
+                         fs_detail=[0], fs_brightness=[1], fs_glow=[0], fs_folds=[0],
+                         fs_wallpaper=[0], fs_background=[0, 0, 0])
         defaults.update(uniforms)
         for key, values in defaults.items():
             location = self.call("glGetUniformLocation", program, key.encode())
@@ -387,6 +388,19 @@ def validate(gpu):
     gpu.draw("presentation", scratch, [dye[0]], fs_opacity=[1])
     displayed = gpu.read(scratch)
     assert all(value == 1 for value in displayed[3::4])
+    # Wallpaper mode preserves emitted RGB and exposes the desktop through alpha.
+    gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1], fs_wallpaper=[1])
+    transparent = gpu.read(scratch)
+    assert all(abs(a-b) < 0.001 for i, (a, b) in enumerate(zip(displayed, transparent)) if i % 4 != 3)
+    assert all(0 <= a <= 1 for a in transparent[3::4])
+    assert any(a < 0.99 for a in transparent[3::4])
+    background = [0.125, 0.25, 0.5]
+    gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1], fs_background=background)
+    solid = gpu.read(scratch)
+    for i in range(0, len(solid), 4):
+        assert solid[i+3] == 1
+        for c in range(3):
+            assert abs(solid[i+c] - (transparent[i+c] + background[c] * (1-transparent[i+3]))) < 0.002
     # Optional presentation branches must remain finite and opaque even at
     # maximum exposure, halo and relief; zero input must stay exactly black.
     lighting_cases = [(1, 0, 0), (2.4, .4, .35), (2.1, .25, .65), (4, 1, 1)]
@@ -404,6 +418,14 @@ def validate(gpu):
         gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1],
                  fs_brightness=[brightness], fs_glow=[glow], fs_folds=[folds])
         assert all(v == 0 for i, v in enumerate(gpu.read(scratch)) if i % 4 != 3)
+
+    gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1], fs_wallpaper=[1],
+             fs_brightness=[4], fs_glow=[1], fs_folds=[1])
+    assert all(v == 0 for v in gpu.read(scratch)), 'idle wallpaper must be fully transparent'
+    gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1], fs_background=background)
+    idle = gpu.read(scratch)
+    for i in range(0, len(idle), 4):
+        assert idle[i:i+4] == background + [1], 'idle solid background must match selected color'
     # Same signed three-layer sentinel as the native developer view. This checks
     # the diagnostic itself; native Cogl binding must still be checked on-device.
     sentinels = [gpu.target([-.25, 0, 0, 0], 1, 1),
@@ -414,7 +436,7 @@ def validate(gpu):
         offset = 4 * ((h//2)*w + int(w*(i+.5)/3))
         expected = [int(i == j) for j in range(3)] + [1]
         assert result[offset:offset+4] == expected
-    print("PASS: all shaders; projection, walls, viscosity, fade, three-second post-input transport/deformation, curls, finite state, black")
+    print("PASS: all shaders; projection, walls, viscosity, fade, three-second post-input transport/deformation, curls, finite state, black, wallpaper transparency, solid backgrounds")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,8 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
         destroy() {}
     }
     class Actor { destroy() {} }
-    class Content { invalidate() {} }
+    let invalidations = 0;
+    class Content { invalidate() { invalidations++; } }
     const context = vm.createContext({});
     const dependencies = {
         'gi://Clutter': {default: {Actor, Content: {}}},
@@ -50,7 +51,11 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
     assert.equal(surface.active, false);
     surface.update(12, null, false);
     assert.equal(steps.length, 5);
-    surface.configure({parameters: {}, appearance: {mode: 'solid'}, lingerTime: 20});
+    const beforeConfigure = invalidations;
+    surface.configure({parameters: {}, appearance: {mode: 'solid'}, lingerTime: 20,
+        background: {mode: 'wallpaper', color: '#123456'}});
+    assert.equal(surface.probe.background.mode, 'wallpaper');
+    assert.equal(invalidations, beforeConfigure + 1, 'settings repaint even while idle');
     surface.update(13, [0.3, 0.3, 0.4, 0.3], false);
     surface.update(24, null, false);
     assert.equal(surface.active, true, 'longer linger must not clear at ten seconds');

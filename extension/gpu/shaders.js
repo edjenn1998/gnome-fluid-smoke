@@ -202,6 +202,8 @@ export const correctDye = {
 export const presentation = {
     declarations: `
         uniform float fs_opacity;
+        uniform float fs_wallpaper;
+        uniform vec3 fs_background;
         uniform vec2 fs_dye_size;
         uniform float fs_brightness;
         uniform float fs_glow;
@@ -246,7 +248,12 @@ export const presentation = {
         if (fs_brightness > 1.0)
             color = min(color, vec3(0.8)) + vec3(0.2) *
                 (vec3(1.0) - exp(-max(color - vec3(0.8), vec3(0.0)) * 5.0));
-        cogl_color_out = vec4(color * fs_opacity, fs_opacity);
+        // Premultiplied source-over: empty dye reveals the wallpaper. Include
+        // luminous halo coverage so glow stays visible outside the dye itself.
+        float coverage = clamp(max(opacity, max(color.r, max(color.g, color.b))), 0.0, 1.0);
+        vec3 backdrop = fs_background * (1.0 - coverage) * (1.0 - fs_wallpaper);
+        float alpha = mix(1.0, coverage, fs_wallpaper);
+        cogl_color_out = vec4((color + backdrop) * fs_opacity, alpha * fs_opacity);
     `,
 };
 

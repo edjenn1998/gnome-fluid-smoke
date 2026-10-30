@@ -60,17 +60,17 @@ export default class FluidSmokePreferences extends ExtensionPreferences {
             if (modes[mode.selected])
                 settings.set_string('color-mode', modes[mode.selected]);
         });
-        const colorRow = (key, title, enabled) => {
+        const colorRow = (group, key, title, modeKey, enabled, fallback) => {
             const row = new Adw.ActionRow({title});
             const button = new Gtk.ColorDialogButton({dialog: new Gtk.ColorDialog({with_alpha: false}),
                 valign: Gtk.Align.CENTER});
             row.add_suffix(button);
             row.activatable_widget = button;
-            colors.add(row);
+            group.add(row);
             let updating = false;
             watch(key, () => {
                 const [red, green, blue] = parseColor(settings.get_string(key),
-                    key === 'secondary-color' ? '#ff66cc' : '#66ccff');
+                    fallback);
                 updating = true;
                 button.rgba = new Gdk.RGBA({red, green, blue, alpha: 1});
                 updating = false;
@@ -83,12 +83,29 @@ export default class FluidSmokePreferences extends ExtensionPreferences {
                     Math.round(value * 255).toString(16).padStart(2, '0')).join('');
                 settings.set_string(key, `#${hex}`);
             });
-            watch('color-mode', () => { row.sensitive = enabled(settings.get_string('color-mode')); });
+            watch(modeKey, () => { row.sensitive = enabled(settings.get_string(modeKey)); });
         };
-        colorRow('primary-color', 'Primary color', value => value !== 'rainbow');
-        colorRow('secondary-color', 'Second color', value => value === 'gradient');
+        colorRow(colors, 'primary-color', 'Primary color', 'color-mode', value => value !== 'rainbow', '#66ccff');
+        colorRow(colors, 'secondary-color', 'Second color', 'color-mode', value => value === 'gradient', '#ff66cc');
         spin(colors, 'color-speed', 'Color cycling speed',
             'More color changes within each plume. Alpha.6: 1×. No effect on single color.', 0.2, 4, 0.1, 1);
+
+        const background = new Adw.PreferencesGroup({title: 'Background',
+            description: 'Show smoke over your current wallpaper or a custom solid color. Changes apply immediately.'});
+        page.add(background);
+        const backgrounds = ['wallpaper', 'solid'];
+        const backgroundMode = new Adw.ComboRow({title: 'Background mode',
+            model: Gtk.StringList.new(['Keep wallpaper', 'Solid color'])});
+        background.add(backgroundMode);
+        watch('background-mode', () => {
+            backgroundMode.selected = backgrounds.indexOf(settings.get_string('background-mode'));
+        });
+        backgroundMode.connect('notify::selected', () => {
+            if (backgrounds[backgroundMode.selected])
+                settings.set_string('background-mode', backgrounds[backgroundMode.selected]);
+        });
+        colorRow(background, 'background-color', 'Background color', 'background-mode',
+            value => value === 'solid', '#000000');
 
         const fluid = new Adw.PreferencesGroup({title: 'Fluid motion',
             description: 'Shape the actual transported flow, from smooth rolls to frilled edges.'});

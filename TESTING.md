@@ -1,5 +1,20 @@
 # Validation record and acceptance checklist
 
+## 1.1.0 — 2026-10-30
+
+* 26 isolated JavaScript tests pass, covering background settings, preset
+  preservation, presentation uniforms/fallback and repainting while idle.
+* All 11 GLSL 1.20 shaders compile. Offscreen RGBA16F checks pass on Radeon
+  8060S / radeonsi, including unchanged smoke RGB over black, wallpaper alpha,
+  solid-background source-over composition, fully transparent idle wallpaper and
+  exact idle solid colors. Existing simulation checks also pass.
+* Optional shader tools and EGL/GLES libraries were loaded from `/tmp/opencode`
+  without installing system packages. GNOME Shell/GJS are unavailable in this
+  environment; native preferences UI and Cogl desktop appearance require a
+  GNOME 51 Wayland check. Try both modes, change the color while idle, reload the
+  wallpaper, and disable the extension to verify restoration.
+* Strict schema compilation and ZIP integrity pass. Metadata: 1.1.0, numeric 11.
+
 ## 1.0.0 — 2026-10-27
 
 * User feedback on the latest work: “I like it. Publish as version 1.”
