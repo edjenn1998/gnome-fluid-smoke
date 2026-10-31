@@ -124,7 +124,8 @@ python3 -m zipfile -t dist/fluid-smoke@edjenn1998.github.io.shell-extension.zip
 ```
 
 Install the ZIP in `dist/` as described above. The package builder uses a fixed
-file allowlist and deterministic timestamps, and includes the compiled GSettings schema.
+file allowlist and deterministic timestamps, and validates the GSettings schema
+with strict compilation. The ZIP ships the XML; GNOME compiles it on installation.
 
 Optional developer checks (not extension dependencies):
 
