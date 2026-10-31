@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Generated with AI for personal use. Maintainer review required before EGO submission.
 
 export const PRESSURE_ITERATIONS = 24;
 // Leave headroom for timer jitter at the 30 Hz fallback without doubling passes.

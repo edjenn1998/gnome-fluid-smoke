@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Generated with AI for personal use. Maintainer review required before EGO submission.
 
 import Cogl from 'gi://Cogl';
 import * as Shaders from './shaders.js';

@@ -308,6 +308,6 @@ measurement and public-alpha documentation. None are claimed by the probe.
 
 Reviewed the official [best practices](https://gjs.guide/extensions/review-guidelines/best-practices.html)
 and [review guidelines](https://gjs.guide/extensions/review-guidelines/review-guidelines.html).
-Retain the personal-use AI notice until a maintainer has personally read,
-understood and can support the code. GitHub distribution is separate from EGO
+Maintainers should understand and be able to support the code before publication.
+GitHub distribution is separate from EGO
 review; no submission, approval or verified GNOME compatibility is implied.
