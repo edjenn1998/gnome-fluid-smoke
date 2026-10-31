@@ -1,7 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Generated with AI for personal use.
-// Do NOT upload to extensions.gnome.org (EGO) unless you understand JavaScript
-// and can maintain this code.
 
 export function locateMonitor(monitors, x, y) {
     return monitors.findIndex(m => x >= m.x && y >= m.y &&

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Generated with AI for personal use. Maintainer review required before EGO submission.
 
 // Velocity is in grid cells/second; texture coordinates increase down the screen.
 // Every stencil samples cell centers. No pass reads its own render attachment.

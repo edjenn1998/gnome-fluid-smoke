@@ -214,9 +214,8 @@ Runtime is local: no network, telemetry, keystroke/clipboard access, coordinate
 logging or saved movement history. Only the previous pointer sample is retained
 transiently to connect movement.
 
-AI-generated personal-use notices are included. This is not an official GNOME
-project or an extensions.gnome.org submission. EGO publication requires maintainer
-understanding and review of the JavaScript.
+This is an independent project, not an official GNOME project or an
+extensions.gnome.org submission.
 
 Thanks to GNOME Shell/Mutter and GJS documentation contributors. Hanabi and
 ShaderPaper were architectural references; no code/assets were copied. Sources
