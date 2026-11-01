@@ -20,7 +20,7 @@ export function movementSegment(previous, current, monitor) {
         ...localPoint(monitor, current.x, current.y)];
 }
 
-export function probeDimensions(monitor) {
+export function simulationDimensions(monitor) {
     // Conservative grid: pressure projection runs many passes each frame.
     const scale = Math.min(0.5, 384 / Math.max(monitor.width, monitor.height));
     return [Math.max(1, Math.round(monitor.width * scale)),

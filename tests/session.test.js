@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {readSettings} from '../extension/core/settings.js';
+import {STANDARD_PRESET, readSettings} from '../extension/core/settings.js';
 
 class Emitter {
     handlers = new Map();
@@ -28,8 +28,7 @@ async function fixture({wayland = true} = {}) {
     let point = {x: 100, y: 100};
     let time = 1;
     const errors = [];
-    const values = {'smoke-amount': 1.75, 'linger-time': 10, swirl: 8, viscosity: 0.15,
-        'color-mode': 'rainbow', 'primary-color': '#66ccff', 'secondary-color': '#ff66cc'};
+    const values = {...STANDARD_PRESET, 'background-mode': 'solid', 'background-color': '#000000'};
     const preferences = Object.assign(new Emitter(), {
         get_double: key => values[key], get_string: key => values[key],
     });
@@ -109,7 +108,7 @@ async function fixture({wayland = true} = {}) {
     });
     await entry.evaluate();
     return {
-        Session: module.namespace.ProbeSession, timers, surfaces, layout, shield, settings, display, overview,
+        Session: module.namespace.SmokeSession, timers, surfaces, layout, shield, settings, display, overview,
         Extension: entry.namespace.default, shellGlobal, errors, actors, preferences, values,
         emitters: [background, layout, shield, settings, display, overview, preferences],
         move(x, y) { point = {x, y}; time += 0.017; },
@@ -126,7 +125,7 @@ async function fixture({wayland = true} = {}) {
 test('repeated lifecycle and monitor rebuilds release timers, signals and surfaces', async () => {
     const f = await fixture();
     for (let cycle = 0; cycle < 10; cycle++) {
-        const session = new f.Session();
+        const session = new f.Session(f.preferences);
         session.start();
         f.fire();
         f.move(110 + cycle * 10, 110);
@@ -143,7 +142,7 @@ test('repeated lifecycle and monitor rebuilds release timers, signals and surfac
 
 test('sustained missed active callbacks select the bounded 30 Hz fallback', async () => {
     const f = await fixture();
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     session.start();
     f.fire();
     for (let i = 0; i < 35; i++) {
@@ -157,7 +156,7 @@ test('sustained missed active callbacks select the bounded 30 Hz fallback', asyn
 
 test('lock, overview and reduced motion stop polling and allow resume', async () => {
     const f = await fixture();
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     session.start();
     for (const [object, property, signal] of [
         [f.shield, 'active', 'active-changed'],
@@ -176,10 +175,11 @@ test('lock, overview and reduced motion stop polling and allow resume', async ()
 
 test('partial monitor initialization failure rolls back resources', async () => {
     const f = await fixture();
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     session.start();
     f.layout.monitors = [null];
-    assert.throws(() => session.rebuild());
+    f.layout.emit('monitors-changed');
+    assert.match(f.errors[0], /mock monitor allocation failure/);
     assert.equal(f.timers.size, 0);
     assert.ok(f.emitters.every(emitter => emitter.handlers.size === 0));
     session.destroy();
@@ -187,7 +187,7 @@ test('partial monitor initialization failure rolls back resources', async () => 
 
 test('null Wayland compositor rejects startup before allocating resources', async () => {
     const f = await fixture({wayland: false});
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     assert.throws(() => session.start(), /requires GNOME 51 Wayland/);
     session.destroy();
     session.destroy();
@@ -212,7 +212,7 @@ test('extension enable failure rolls back signals and background actors; disable
 
 test('Cogl context failure during hotplug tears down the session', async () => {
     const f = await fixture();
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     session.start();
     f.shellGlobal.stage.context.get_backend = () => { throw new Error('context failure'); };
     f.layout.emit('monitors-changed');
@@ -225,7 +225,7 @@ test('Cogl context failure during hotplug tears down the session', async () => {
 
 test('reset failure from a suspension signal tears down the session', async () => {
     const f = await fixture();
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     session.start();
     f.surfaces[0].reset = () => { throw new Error('GPU clear failure'); };
     f.shield.emit('active-changed');
@@ -238,7 +238,7 @@ test('reset failure from a suspension signal tears down the session', async () =
 
 test('pointer polling failure stops the timer and tears down the session', async () => {
     const f = await fixture();
-    const session = new f.Session();
+    const session = new f.Session(f.preferences);
     session.start();
     session.tracker.get_pointer = () => { throw new Error('pointer failure'); };
     f.fire();

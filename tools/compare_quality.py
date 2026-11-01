@@ -22,7 +22,7 @@ def main():
     def run(label, scenario, root, *options):
         subprocess.run(['python3', 'tools/preview_gpu.py', str(args.output.resolve()),
                         '--root', str(root.resolve()), '--scenario', scenario,
-                        '--label', label, *options], cwd=ROOT, check=True)
+                        '--label', label, '--preset', 'less-smoke', *options], cwd=ROOT, check=True)
         report = json.loads((args.output / f'{label}-{scenario}.json').read_text())
         reports.append(report)
 

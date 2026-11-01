@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
-import {probeDimensions} from '../extension/core/coordinates.js';
+import {simulationDimensions} from '../extension/core/coordinates.js';
 import {simulationParameters} from '../extension/core/simulation.js';
+import {STANDARD_PRESET} from '../extension/core/settings.js';
 
-test('surface keeps stepping without input, then clears and stops at ten seconds', async () => {
+test('surface keeps stepping without input, then stops at the configured linger time', async () => {
     const steps = [];
     let clears = 0;
     class Simulation {
@@ -15,7 +16,7 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
         step(dt, segment) { steps.push({dt, segment}); }
         destroy() {}
     }
-    class Actor { destroy() {} }
+    class Actor { set_content() {} destroy() {} }
     let invalidations = 0;
     class Content { invalidate() { invalidations++; } }
     const context = vm.createContext({});
@@ -23,8 +24,9 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
         'gi://Clutter': {default: {Actor, Content: {}}},
         'gi://GObject': {default: {Object: Content, registerClass: (_props, cls) => cls}},
         '../gpu/feedback.js': {FluidSimulation: Simulation},
-        '../core/coordinates.js': {probeDimensions},
+        '../core/coordinates.js': {simulationDimensions},
         '../core/simulation.js': {simulationParameters},
+        '../core/settings.js': {STANDARD_PRESET},
     };
     const module = new vm.SourceTextModule(await readFile(new URL(
         '../extension/shell/surface.js', import.meta.url), 'utf8'), {context});
@@ -42,24 +44,24 @@ test('surface keeps stepping without input, then clears and stops at ten seconds
     surface.update(1, null, false);
     surface.update(1.08, [0.3, 0.3, 0.4, 0.3], false);
     assert.ok(Math.abs(steps[0].dt - 0.08) < 1e-9, 'use actual idle sampling interval');
-    for (const time of [1.1, 2, 5, 10.9])
+    for (const time of [1.1, 2, 5, 18.9])
         surface.update(time, null, false);
     assert.equal(steps.length, 5);
     assert.ok(steps.slice(1).every(step => step.segment === null));
-    surface.update(11.08, null, false);
+    surface.update(19.08, null, false);
     assert.equal(clears, 1);
     assert.equal(surface.active, false);
-    surface.update(12, null, false);
+    surface.update(20, null, false);
     assert.equal(steps.length, 5);
     const beforeConfigure = invalidations;
     surface.configure({parameters: {}, appearance: {mode: 'solid'}, lingerTime: 20,
         background: {mode: 'wallpaper', color: '#123456'}});
-    assert.equal(surface.probe.background.mode, 'wallpaper');
+    assert.equal(surface.simulation.background.mode, 'wallpaper');
     assert.equal(invalidations, beforeConfigure + 1, 'settings repaint even while idle');
-    surface.update(13, [0.3, 0.3, 0.4, 0.3], false);
-    surface.update(24, null, false);
-    assert.equal(surface.active, true, 'longer linger must not clear at ten seconds');
-    surface.update(33, null, false);
+    surface.update(21, [0.3, 0.3, 0.4, 0.3], false);
+    surface.update(40, null, false);
+    assert.equal(surface.active, true, 'longer linger must not clear at eighteen seconds');
+    surface.update(41, null, false);
     assert.equal(surface.active, false);
     assert.equal(clears, 2);
     surface.destroy();

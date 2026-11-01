@@ -3,14 +3,15 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import {FluidSimulation} from '../gpu/feedback.js';
-import {probeDimensions} from '../core/coordinates.js';
+import {simulationDimensions} from '../core/coordinates.js';
 import {simulationParameters} from '../core/simulation.js';
+import {STANDARD_PRESET} from '../core/settings.js';
 
-const ProbeContent = GObject.registerClass({
+const SmokeContent = GObject.registerClass({
     Implements: [Clutter.Content],
-}, class ProbeContent extends GObject.Object {
+}, class SmokeContent extends GObject.Object {
     vfunc_paint_content(actor, root, _context) {
-        const node = Clutter.PipelineNode.new(this.probe.presentationPipeline(actor.get_paint_opacity()));
+        const node = Clutter.PipelineNode.new(this.simulation.presentationPipeline(actor.get_paint_opacity()));
         node.add_rectangle(actor.get_content_box());
         root.add_child(node);
     }
@@ -22,17 +23,17 @@ export class MonitorSurface {
         this.lastMotion = 0;
         this.lastFrame = 0;
         this.active = false;
-        this.lingerTime = 10;
-        const [width, height] = probeDimensions(monitor);
-        this.probe = new FluidSimulation(context, width, height);
+        this.lingerTime = STANDARD_PRESET['linger-time'];
+        const [width, height] = simulationDimensions(monitor);
+        this.simulation = new FluidSimulation(context, width, height);
     }
 
     initialize(parent) {
-        this.probe.initialize();
-        this.content = new ProbeContent();
-        this.content.probe = this.probe;
+        this.simulation.initialize();
+        this.content = new SmokeContent();
+        this.content.simulation = this.simulation;
         this.actor = new Clutter.Actor({
-            name: `fluid-smoke-probe-${this.monitor.index}`,
+            name: `fluid-smoke-${this.monitor.index}`,
             x: this.monitor.x,
             y: this.monitor.y,
             width: this.monitor.width,
@@ -45,10 +46,10 @@ export class MonitorSurface {
     }
 
     configure({parameters, appearance, lingerTime, background, debugView = 'normal'}) {
-        this.probe.parameters = simulationParameters(parameters);
-        this.probe.appearance = appearance;
-        this.probe.background = background;
-        this.probe.debugView = debugView;
+        this.simulation.parameters = simulationParameters(parameters);
+        this.simulation.appearance = appearance;
+        this.simulation.background = background;
+        this.simulation.debugView = debugView;
         this.lingerTime = lingerTime;
         this.content.invalidate();
     }
@@ -73,24 +74,27 @@ export class MonitorSurface {
             this.reset();
             return;
         }
-        this.probe.step(dt, segment, now * 0.7);
+        this.simulation.step(dt, segment, now * 0.7);
         this.content.invalidate();
     }
 
     reset() {
         this.active = false;
         this.lastFrame = 0;
-        this.probe.clear();
+        this.simulation.clear();
         this.content.invalidate();
     }
 
     destroy() {
-        this.actor?.destroy();
+        if (this.actor) {
+            this.actor.set_content(null);
+            this.actor.destroy();
+        }
         this.actor = null;
         if (this.content)
-            this.content.probe = null;
+            this.content.simulation = null;
         this.content = null;
-        this.probe.destroy();
-        this.probe = null;
+        this.simulation.destroy();
+        this.simulation = null;
     }
 }

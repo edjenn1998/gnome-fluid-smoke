@@ -351,8 +351,7 @@ def validate(gpu):
     diffused = gpu.read(velocity[1])[0::4]
     assert 0 < max(diffused) < 12 and min(diffused) >= 0
 
-    # Replay the production planner, sources and alpha.2 pass graph rather
-    # than maintaining a second solver whose tuning can drift from the extension.
+    # Replay production commands so source tuning and pass ordering stay in sync.
     recording = json.loads(subprocess.check_output([
         'node', '--experimental-vm-modules', 'tools/preview_commands.js',
         'circle', str(w), str(h)], cwd=ROOT))
@@ -403,7 +402,7 @@ def validate(gpu):
             assert abs(solid[i+c] - (transparent[i+c] + background[c] * (1-transparent[i+3]))) < 0.002
     # Optional presentation branches must remain finite and opaque even at
     # maximum exposure, halo and relief; zero input must stay exactly black.
-    lighting_cases = [(1, 0, 0), (2.4, .4, .35), (2.1, .25, .65), (4, 1, 1)]
+    lighting_cases = [(1, 0, 0), (2.4, .4, .35), (2.1, .25, .65), (2.4, .4, .65), (4, 1, 1)]
     for brightness, glow, folds in lighting_cases:
         gpu.draw('presentation', scratch, [dye[0]], fs_opacity=[1],
                  fs_brightness=[brightness], fs_glow=[glow], fs_folds=[folds])

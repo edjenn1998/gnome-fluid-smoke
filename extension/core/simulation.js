@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import {STANDARD_PRESET} from './settings.js';
+
 export const PRESSURE_ITERATIONS = 24;
 // Leave headroom for timer jitter at the 30 Hz fallback without doubling passes.
 export const MAX_STEP = 1 / 24;
 export const MAX_SUBSTEPS = 2;
 
-// Bounded flow defaults. Viscosity is cells²/second; decay
-// coefficients are per second. Explicit diffusion requires nu * dt <= 1/4.
+// Viscosity is cells²/s; dissipation is per second.
 export const DEFAULT_PARAMETERS = Object.freeze({
-    viscosity: 0.15,
+    viscosity: STANDARD_PRESET.viscosity,
     velocityDissipation: 0.18,
-    dyeDissipation: 0.65,
-    vorticity: 8,
-    smokeAmount: 1.75,
-    sourceWidth: 1,
-    momentumSpread: 2.5,
-    buoyancy: 6,
-    fineDetail: 0,
-    brightness: 1,
-    glow: 0,
-    foldShading: 0,
+    dyeDissipation: 6.5 / STANDARD_PRESET['linger-time'],
+    vorticity: STANDARD_PRESET.swirl,
+    smokeAmount: STANDARD_PRESET['smoke-amount'],
+    sourceWidth: STANDARD_PRESET['source-width'],
+    momentumSpread: STANDARD_PRESET['momentum-spread'],
+    buoyancy: STANDARD_PRESET.buoyancy,
+    fineDetail: STANDARD_PRESET['fine-detail'],
+    brightness: STANDARD_PRESET.brightness,
+    glow: STANDARD_PRESET.glow,
+    foldShading: STANDARD_PRESET['fold-shading'],
 });
 
 export function simulationParameters(overrides = {}) {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 — 2026-11-01
+
+* Make Luminous Rolls & Billowing Clouds the standard appearance, combining
+  billowing flow with luminous lighting and gentle lift.
+* Rename the original Alpha.6 appearance to Less Smoke.
+* Show numeric smoke controls as signed adjustments from the new standard.
+  Keep absolute values in GSettings so saved custom settings retain their meaning.
+* Rename the remaining probe classes and properties for their current roles,
+  centralize startup rollback, and detach Clutter content during teardown.
+* Replace obsolete development gates and repeated historical notes with current
+  architecture, settings and testing documentation.
+
 ## 1.1.1 — 2026-11-01
 
 * Package the current reviewed source with schema XML, without compiled schemas.

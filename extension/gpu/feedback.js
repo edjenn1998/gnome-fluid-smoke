@@ -35,7 +35,6 @@ export class FluidSimulation {
         this.dyeHeight = height * 2;
         this.targets = [];
         this.pipelines = {};
-        // Construction is side-effect free so partial initialization can roll back.
         this.context = context;
     }
 
@@ -95,7 +94,7 @@ export class FluidSimulation {
         const steps = planSteps(elapsed, segment, this.width, this.height);
         const color = smokeColor(hue, this.appearance);
         for (const {dt, segment: part, impulse} of steps) {
-            // Resolve a modest filament inside a wider momentum/shear envelope.
+            // The dye source is narrower than the area receiving momentum.
             const radius = Math.max(1.5, Math.min(this.width, this.height) * 0.014) *
                 this.parameters.sourceWidth;
             const injection = {
@@ -118,8 +117,7 @@ export class FluidSimulation {
                 {fs_vorticity: [this.parameters.vorticity], fs_detail: [this.parameters.fineDetail]});
             this.velocity.reverse();
             this.draw('divergence', this.divergence, [this.velocity[0]], dt);
-            // Keep the previous pressure as an initial guess. Lifecycle clear()
-            // still resets all fields, including pressure, on suspension/idle.
+            // Warm-start pressure; clear() resets it on idle or suspension.
             for (let i = 0; i < PRESSURE_ITERATIONS; i++) {
                 this.draw('pressure', this.pressure[1], [this.pressure[0], this.divergence], dt);
                 this.pressure.reverse();
@@ -138,8 +136,7 @@ export class FluidSimulation {
             this.dye[0].framebuffer.flush();
         this.pipelines.presentation.set_layer_texture(0, this.dye[0].texture);
         if (this.debugView !== 'normal' && this.debugView !== 'layers') {
-            // Only diagnostic mode submits these additional passes. Pre-project
-            // divergence is already retained by the production pass graph.
+            // Retain both pre- and post-projection divergence for comparison.
             this.debugDivergence ??= this.target();
             this.draw('curl', this.curl, [this.velocity[0]], 0);
             this.draw('divergence', this.debugDivergence, [this.velocity[0]], 0);
@@ -183,7 +180,7 @@ export class FluidSimulation {
     }
 
     destroy() {
-        // Native release remains GJS GC-dependent; drop all bindings and owners.
+        // Cogl boxed objects are released by GJS once their owners are dropped.
         this.pipelines = {};
         this.targets = [];
         this.velocity = this.dye = this.pressure = null;

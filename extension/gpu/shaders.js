@@ -86,8 +86,7 @@ export const confine = {
         vec2 n = vec2(abs(r) - abs(l), abs(b) - abs(t));
         n /= max(length(n), 0.0001);
         float c = (4.0 * texture2D(cogl_sampler1, uv).r + l + r + t + b) * 0.125;
-        // Blend toward cell-scale confinement for frilled cloud edges. This is
-        // driven by transported curl, not procedural noise or a painted texture.
+        // Blend the smoothed curl envelope with cell-scale confinement.
         if (fs_detail > 0.0) {
             vec2 q = 1.0 / fs_size;
             float fl = texture2D(cogl_sampler1, bounded(uv - vec2(q.x, 0.0))).r;
@@ -110,8 +109,7 @@ export const divergence = {
     body: `
         vec2 uv = cogl_tex_coord_in[0].xy;
         vec2 h = 1.0 / fs_size;
-        // Backward divergence / forward pressure gradient compose to the exact
-        // five-point Laplacian solved by Jacobi. Centered/centered did not.
+        // Backward divergence and forward gradient match Jacobi's five-point Laplacian.
         vec2 v = velocity(uv);
         float l = uv.x < h.x ? 0.0 : velocity(uv - vec2(h.x, 0.0)).x;
         float t = uv.y < h.y ? 0.0 : velocity(uv - vec2(0.0, h.y)).y;
@@ -188,9 +186,7 @@ export const correctDye = {
         vec4 d = texture2D(cogl_sampler1, base + h);
         dye = clamp(dye, min(min(a, b), min(c, d)), max(max(a, b), max(c, d)));
         dye *= exp(-fs_dye_decay * fs_dt);
-        // A moving source can catch its own advected dye and repeatedly load
-        // the jet head. Smoothly reduce new emission into already dense smoke;
-        // do not clamp away the structure/tint of smoke transported into a fold.
+        // Reduce emission into dense smoke to avoid saturating the moving jet head.
         float amount = splat(uv) * fs_amount * exp(-dye.a / 0.6);
         dye += vec4(fs_color * amount, amount);
         // RGB is density-weighted, alpha is scalar smoke density (not opacity).
@@ -230,8 +226,7 @@ export const presentation = {
             color *= mix(1.0, light, fs_folds);
         }
         if (fs_glow > 0.0) {
-            // Two sparse blur rings; no extra targets/passes. Exact black stays
-            // black and alpha.6 takes neither optional sampling branch.
+            // Two sparse blur rings avoid a separate bloom target.
             vec3 halo = vec3(0.0);
             for (int i = 1; i <= 2; i++) {
                 vec2 h = float(i) * 12.0 / fs_dye_size;
@@ -243,7 +238,7 @@ export const presentation = {
             color += fs_glow * halo * 0.125;
         }
         color *= fs_brightness;
-        // Soft shoulder only above the old output range; alpha.6 is unchanged.
+        // Compress highlights when exposure is raised.
         if (fs_brightness > 1.0)
             color = min(color, vec3(0.8)) + vec3(0.2) *
                 (vec3(1.0) - exp(-max(color - vec3(0.8), vec3(0.0)) * 5.0));

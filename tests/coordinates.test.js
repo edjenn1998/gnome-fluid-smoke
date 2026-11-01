@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {locateMonitor, localPoint, movementSegment, probeDimensions} from '../extension/core/coordinates.js';
+import {locateMonitor, localPoint, movementSegment, simulationDimensions} from '../extension/core/coordinates.js';
 
 const monitors = [
     {x: -1920, y: 120, width: 1920, height: 1080, scale: 1},
@@ -29,9 +29,9 @@ test('monitor transitions and pointer warps never create cross-desktop segments'
     assert.ok(segment.every(Number.isFinite));
 });
 
-test('probe grids are bounded for 8K and tiny logical monitors', () => {
+test('simulation grids are bounded for 8K and tiny logical monitors', () => {
     for (const monitor of [...monitors, {width: 7680, height: 4320}, {width: 1, height: 1}]) {
-        const dimensions = probeDimensions(monitor);
+        const dimensions = simulationDimensions(monitor);
         assert.ok(dimensions.every(n => Number.isInteger(n) && n > 0 && n <= 384));
     }
 });

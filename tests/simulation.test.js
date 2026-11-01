@@ -152,12 +152,12 @@ test('smoke amount scales emission with a separate wider momentum envelope', asy
         fluid.initialize();
         fluid.step(1 / 60, [0.2, 0.3, 0.4, 0.5], 0);
         amounts.push(f.draws.at(-1).uniforms.fs_amount[0]);
-        assert.equal(f.draws[1].uniforms.fs_radius[0], 3.75);
-        assert.equal(f.draws.at(-1).uniforms.fs_radius[0], 1.5);
+        assert.ok(Math.abs(f.draws[1].uniforms.fs_radius[0] - 1.5 * 2.8 * 1.8) < 1e-12);
+        assert.equal(f.draws.at(-1).uniforms.fs_radius[0], 1.5 * 2.8);
         assert.equal(f.draws[1].uniforms.fs_velocity_decay[0], 0.18);
     }
-    assert.equal(amounts[1], amounts[0] * 1.75);
-    assert.equal(amounts[2], amounts[0] * 3);
+    assert.ok(Math.abs(amounts[1] - amounts[0] * 1.75) < 1e-12);
+    assert.ok(Math.abs(amounts[2] - amounts[0] * 3) < 1e-12);
 });
 
 test('partial GPU allocation can release every recorded native owner', async () => {

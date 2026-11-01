@@ -8,30 +8,28 @@ import {locateMonitor, movementSegment} from '../core/coordinates.js';
 import {MonitorSurface} from './surface.js';
 import {readSettings} from '../core/settings.js';
 
-export class ProbeSession {
-    constructor({fps = 60, settings = null} = {}) {
+export class SmokeSession {
+    constructor(settings) {
         this.settings = settings;
         this.signals = [];
         this.surfaces = [];
         this.source = 0;
         this.previous = null;
-        this.frameInterval = fps === 30 ? 33 : 17;
+        this.frameInterval = 17;
         this.slowFrames = 0;
         this.lastTick = 0;
     }
 
     start() {
-        // GNOME 51 exposes the compositor through the Shell-owned Meta.Context.
         if (global.context.get_wayland_compositor() === null)
             throw new Error('Fluid Smoke requires GNOME 51 Wayland');
         this.tracker = global.backend.get_cursor_tracker();
         this.stSettings = St.Settings.get();
-        // Isolated private Shell dependency: the real desktop background group.
         const backgrounds = Main.layoutManager._backgroundGroup;
-        this.group = new Clutter.Actor({name: 'fluid-smoke-probe', reactive: false});
+        this.group = new Clutter.Actor({name: 'fluid-smoke', reactive: false});
         backgrounds.add_child(this.group);
         this.watch(backgrounds, 'child-added', () => {
-            // Wallpaper reloads must not cover this extension-managed backdrop.
+            // Keep wallpaper reloads below the smoke without raising it above windows.
             backgrounds.set_child_above_sibling(this.group, null);
         });
         this.watch(Main.layoutManager, 'monitors-changed', () => this.rebuild());
@@ -40,8 +38,7 @@ export class ProbeSession {
         this.watch(Main.overview, 'hidden', () => this.refresh());
         this.watch(this.stSettings, 'notify::reduced-motion', () => this.refresh());
         this.watch(Main.screenShield, 'active-changed', () => this.refresh());
-        if (this.settings)
-            this.watch(this.settings, 'changed', () => this.applySettings());
+        this.watch(this.settings, 'changed', () => this.applySettings());
         this.rebuild();
     }
 
@@ -71,7 +68,6 @@ export class ProbeSession {
             try {
                 this.tick();
             } catch (error) {
-                // A failed GPU/GI probe must stop, not throw on every timer tick.
                 this.stopAfterError(error);
             }
             return GLib.SOURCE_REMOVE;
@@ -97,24 +93,17 @@ export class ProbeSession {
             surface.destroy();
         this.surfaces = [];
         this.previous = null;
-        try {
-            const context = global.stage.context.get_backend().get_cogl_context();
-            for (const monitor of Main.layoutManager.monitors) {
-                const surface = new MonitorSurface(monitor, context);
-                this.surfaces.push(surface);
-                surface.initialize(this.group);
-            }
-            this.applySettings();
-            this.refresh();
-        } catch (error) {
-            this.destroy();
-            throw error;
+        const context = global.stage.context.get_backend().get_cogl_context();
+        for (const monitor of Main.layoutManager.monitors) {
+            const surface = new MonitorSurface(monitor, context);
+            this.surfaces.push(surface);
+            surface.initialize(this.group);
         }
+        this.applySettings();
+        this.refresh();
     }
 
     applySettings() {
-        if (!this.settings)
-            return;
         const options = readSettings(this.settings);
         for (const surface of this.surfaces)
             surface.configure(options);
@@ -154,7 +143,8 @@ export class ProbeSession {
         for (const surface of this.surfaces)
             surface.destroy();
         this.surfaces = [];
-        this.group?.destroy();
+        if (this.group)
+            this.group.destroy();
         this.group = null;
         this.tracker = null;
         this.stSettings = null;

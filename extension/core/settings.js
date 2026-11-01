@@ -1,31 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Shared, GI-free conversion for live preferences and smoke colors.
-export const SETTING_KEYS = Object.freeze([
-    'smoke-amount', 'linger-time', 'swirl', 'viscosity',
-    'color-mode', 'primary-color', 'secondary-color',
-    'source-width', 'momentum-spread', 'buoyancy', 'fine-detail',
-    'brightness', 'glow', 'fold-shading', 'color-speed',
-    'background-mode', 'background-color',
-]);
 
-// Full visual recipes. Alpha.6 is also the schema default; existing installs
-// retain their saved amount/colors/motion until a preset is explicitly applied.
-const alpha6 = {
+const lessSmoke = {
     'smoke-amount': 1.75, 'linger-time': 10, 'swirl': 8, 'viscosity': 0.15,
     'color-mode': 'rainbow', 'primary-color': '#66ccff', 'secondary-color': '#ff66cc',
     'source-width': 1, 'momentum-spread': 2.5, 'buoyancy': 6, 'fine-detail': 0,
     'brightness': 1, 'glow': 0, 'fold-shading': 0, 'color-speed': 1,
 };
+const luminous = {...lessSmoke, 'source-width': 1.8, 'momentum-spread': 2.2,
+    'buoyancy': 1.5, 'linger-time': 14, 'brightness': 2.4, 'glow': 0.4,
+    'fold-shading': 0.35, 'fine-detail': 0.2, 'color-speed': 1.6};
+const billowing = {...lessSmoke, 'source-width': 2.8, 'momentum-spread': 1.8,
+    'buoyancy': 0, 'linger-time': 18, 'swirl': 11, 'viscosity': 0.05,
+    'brightness': 2.1, 'glow': 0.25, 'fold-shading': 0.65, 'fine-detail': 0.85,
+    'color-speed': 2.5};
+
+export const STANDARD_PRESET = Object.freeze({...billowing,
+    'viscosity': luminous.viscosity, 'buoyancy': luminous.buoyancy,
+    'brightness': luminous.brightness, 'glow': luminous.glow});
+
 export const PRESETS = Object.freeze({
-    alpha6: Object.freeze(alpha6),
-    photo: Object.freeze({...alpha6, 'source-width': 1.8, 'momentum-spread': 2.2,
-        'buoyancy': 1.5, 'linger-time': 14, 'brightness': 2.4, 'glow': 0.4,
-        'fold-shading': 0.35, 'fine-detail': 0.2, 'color-speed': 1.6}),
-    video: Object.freeze({...alpha6, 'source-width': 2.8, 'momentum-spread': 1.8,
-        'buoyancy': 0, 'linger-time': 18, 'swirl': 11, 'viscosity': 0.05,
-        'brightness': 2.1, 'glow': 0.25, 'fold-shading': 0.65, 'fine-detail': 0.85,
-        'color-speed': 2.5}),
+    standard: STANDARD_PRESET,
+    'less-smoke': Object.freeze(lessSmoke),
+    luminous: Object.freeze(luminous),
+    billowing: Object.freeze(billowing),
 });
+
+export const SETTING_KEYS = Object.freeze([
+    ...Object.keys(STANDARD_PRESET), 'background-mode', 'background-color',
+]);
 
 export function applyPreset(settings, name) {
     const preset = PRESETS[name];
@@ -75,7 +77,12 @@ export function parseColor(value, fallback = '#66ccff') {
     return [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16) / 255);
 }
 
-export function smokeColor(hue, {mode = 'rainbow', primary, secondary, speed = 1} = {}) {
+export function smokeColor(hue, {
+    mode = STANDARD_PRESET['color-mode'],
+    primary = STANDARD_PRESET['primary-color'],
+    secondary = STANDARD_PRESET['secondary-color'],
+    speed = STANDARD_PRESET['color-speed'],
+} = {}) {
     hue *= speed;
     if (mode === 'solid')
         return parseColor(primary);
