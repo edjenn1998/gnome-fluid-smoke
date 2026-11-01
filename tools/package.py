@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Build a deterministic GNOME extension archive with compiled settings; no installation."""
+"""Build a deterministic GNOME extension archive with validated settings; no installation."""
 import hashlib
 import argparse
 import json
@@ -32,7 +32,6 @@ def main():
                         str(root / "extension/schemas")], check=True)
         sources = {name: (root / "extension" / name).read_bytes() for name in FILES}
         sources["LICENSE"] = (root / "LICENSE").read_bytes()
-        sources["schemas/gschemas.compiled"] = (Path(temporary) / "gschemas.compiled").read_bytes()
     with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
         for name, data in sorted(sources.items()):
             info = ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
