@@ -10,7 +10,13 @@ Move the pointer to stir colored smoke over your wallpaper or a custom solid col
 and desktop controls. Simulation stays inside GNOME using Cogl GPU textures;
 there is no external renderer or downloaded runtime dependency.
 
-## Version 1.1.0 — wallpaper and background colors
+## Version 1.1.1 — packaging maintenance
+
+This maintenance release includes the reviewed metadata and packaging cleanup.
+It ships schema XML for installation-time compilation, without changing the fluid
+solver, visual presets, background choices or adjustable simulation settings.
+
+### Wallpaper and background colors
 
 Preferences now include **Background mode → Keep wallpaper / Solid color** and a
 **Background color** picker. Changes apply immediately, including while smoke is
@@ -64,7 +70,7 @@ and target-hardware performance measurements are future work.
 ## Download and install
 
 Download `fluid-smoke@edjenn1998.github.io.shell-extension.zip` from the
-[v1.1.0 stable release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v1.1.0).
+[v1.1.1 stable release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v1.1.1).
 The release also includes `SHA256SUMS` to verify the extension ZIP.
 The [alpha.7 release](https://github.com/edjenn1998/gnome-fluid-smoke/releases/tag/v0.2.0-alpha.7)
 retains `fluid-smoke-alpha7-previews.zip` and the separate original alpha.6
@@ -96,7 +102,7 @@ gnome-extensions enable fluid-smoke@edjenn1998.github.io
 gnome-extensions info fluid-smoke@edjenn1998.github.io
 ```
 
-Expect version `1.1.0` / numeric version `11` for this build. GNOME 51 / Wayland is the
+Expect version name `1.1.1` for this build. GNOME 51 / Wayland is the
 only target; development began for CachyOS GNOME 51.1. Matching GNOME Shell/Mutter
 packages and a driver supporting renderable/filterable RGBA16F textures supply
 the runtime dependencies.

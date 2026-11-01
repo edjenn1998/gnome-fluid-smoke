@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 — 2026-11-01
+
+* Package the current reviewed source with schema XML, without compiled schemas.
+* Remove the deprecated developer-managed metadata version; use version-name.
+* Preserve the solver, shaders, presets, live settings and wallpaper/solid backgrounds.
+* Validate 26 automated tests, 11 GLSL checks and offscreen numerical/rendering checks.
+  The maintainer reports expected desktop behavior; offscreen checks use llvmpipe
+  and do not establish native Cogl integration or target-hardware performance.
+
 ## 1.1.0 — 2026-10-30
 
 * Added live Background mode preferences: keep the current GNOME wallpaper or
